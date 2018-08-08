@@ -22,7 +22,7 @@ function varargout = TipTrackerv3(varargin)
 
 % Edit the above text to modify the response to help TipTrackerv3
 
-% Last Modified by GUIDE v2.5 01-Aug-2018 11:55:19
+% Last Modified by GUIDE v2.5 04-Aug-2018 15:17:46
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -445,6 +445,11 @@ handles.images = struct( ...
     'segmented', [], ...
     'midline', [], ...
     'tip', [], ...
+    'boundary', [], ...
+    'boundary_D', [], ...
+    'boundary_FM', [], ...
+    'axial', [], ...
+    'radial', [], ...
     'test', [], ...
     'white', [], ...
     'black', []);
@@ -497,6 +502,15 @@ for iC = 1:handles.nC
 end
 set(handles.pop_display_image_channel, 'String',{1:handles.nC}, 'enable','on');
 set(handles.pop_display_merge_channel, 'String',{1:handles.nC}, 'enable','on');
+handles = fnc_update_slider_limits(handles);
+% set default pixel size and spacing
+handles.param.pixel_size = [1 1 1];
+handles.param.TimeStamps = 0:handles.nT-1;
+% updating control values to reflect the raw image size and details
+set(handles.txt_xy_sz, 'string',num2str(handles.param.pixel_size(1), '%4.2f'));
+set(handles.txt_z_sz, 'string',num2str(handles.param.pixel_size(3), '%4.2f'));
+
+function handles = fnc_update_slider_limits(handles)
 % update the Z limits
 if handles.nZ > 1
     set(handles.sld_Z, 'Min', 1, 'Max', handles.nZ, 'Value', 1, 'SliderStep', [1/(handles.nZ-1) 10/(handles.nZ-1)],'enable','on');
@@ -523,17 +537,6 @@ end
 handles.xyinc = 1;
 handles.zinc = 1;
 handles.tinc = 1;
-% Sizes along each dimension are initially set to the size of the raw image
-handles.nY = handles.nY;
-handles.nX = handles.nX;
-handles.nZ = handles.nZ;
-handles.nT = handles.nT;
-% set default pixel size and spacing
-handles.param.pixel_size = [1 1 1];
-handles.param.TimeStamps = 0:handles.nT-1;
-% updating control values to reflect the raw image size and details
-set(handles.txt_xy_sz, 'string',num2str(handles.param.pixel_size(1), '%4.2f'));
-set(handles.txt_z_sz, 'string',num2str(handles.param.pixel_size(3), '%4.2f'));
 
 function chk_Z_to_T_Callback(hObject, eventdata, handles)
 
@@ -558,6 +561,7 @@ function handles = fnc_update(handles)
 handles = fnc_crop(handles);
 
 [handles.nY,handles.nX,handles.nC,handles.nZ,handles.nT] = size(handles.images.initial);
+handles = fnc_update_slider_limits(handles);
 % normalise the image by channel
 if get(handles.chk_normalise, 'Value')
     for iC = 1:handles.nC
@@ -692,6 +696,12 @@ fnc_clear_overlays(handles)
 fnc_param_save(handles);
 % clears all the thumbnails except the first one
 handles = fnc_thumbnail_display('setup',handles);
+    Z_first = handles.expt.Z_first;
+    Z_last = handles.expt.Z_last;
+    T_first = handles.expt.T_first;
+    T_last = handles.expt.T_last;
+    nC = size(handles.images.raw,3);
+    handles.images.initial = [];
 if handles.expt.crop_use == 1
     if handles.expt.rotation_angle ~= 0
         temp = imrotate(handles.images.raw,handles.expt.rotation_angle,'bilinear','loose');
@@ -700,11 +710,7 @@ if handles.expt.crop_use == 1
     end
     % get the previously set crop co-ordinates
     crop = handles.expt.crop;
-    Z_first = handles.expt.Z_first;
-    Z_last = handles.expt.Z_last;
-    T_first = handles.expt.T_first;
-    T_last = handles.expt.T_last;
-    handles.images.initial = [];
+
     [~, ~, nC, ~, ~] = size(temp);
     handles.images.initial  = single(temp(crop(2):crop(2)+crop(4), crop(1):crop(1)+crop(3),1:nC,Z_first:Z_last,T_first:T_last));
     % update the initial thumbnail to reflect the cropped image
@@ -714,9 +720,9 @@ if handles.expt.crop_use == 1
 else
     % no crop needed, just update the images
     if handles.expt.rotation_angle ~= 0
-        handles.images.initial = imrotate(handles.images.raw,handles.expt.rotation_angle,'bilinear','loose');
+        handles.images.initial = imrotate(handles.images.raw(:,:,1:nC,Z_first:Z_last,T_first:T_last),handles.expt.rotation_angle,'bilinear','loose');
     else
-        handles.images.initial = handles.images.raw;
+        handles.images.initial = handles.images.raw(:,:,1:nC,Z_first:Z_last,T_first:T_last);
     end
 end
 set(handles.pop_display_image, 'Value', find(strcmpi(get(handles.pop_display_image, 'String'), 'initial')));
@@ -766,6 +772,9 @@ set(handles.pop_segment_method,'String',handles.options.segment_method)
 set(handles.pop_tip_trace_channel,'String', {0:5}, 'Value',1)
 set(handles.pop_tip_spk_channel,'String', {0:5}, 'Value',1)
 
+handles.options.tip_profile_method = {'nearest';'erode';'mormals'};
+set(handles.pop_tip_profile_method,'String',handles.options.tip_profile_method)
+
 handles.options.spk_method = {'threshold';'template'};
 set(handles.pop_spk_method,'String',handles.options.spk_method)
 % image display controls
@@ -780,6 +789,11 @@ handles.options.image_names = { ...
     'segmented'; ...
     'midline'; ...
     'tip'; ...
+    'boundary'; ...
+    'boundary_D'; ...
+    'boundary_FM'; ...
+    'axial'; ...
+    'radial'; ...
     'rotated'; ...
     'test'; ...
     'white'; ...
@@ -864,9 +878,12 @@ set(handles.txt_tip_filter_median, 'string',handles.param.filter_median);
 
 % update the trace parameters
 set(handles.txt_tip_trace_distance, 'string',handles.param.tip_trace_distance);
-set(handles.txt_tip_profile_erode, 'string',handles.param.profile_erode);
-set(handles.txt_tip_profile_sigma, 'string',handles.param.profile_sigma);
-set(handles.txt_tip_profile_length, 'string',handles.param.profile_length);
+
+% update the profile parameters
+set(handles.pop_tip_profile_method, 'Value',find(strcmp(get(handles.pop_tip_profile_method,'String'),handles.param.tip_profile_method)))
+set(handles.txt_tip_profile_erode, 'string',handles.param.tip_profile_erode);
+set(handles.txt_tip_profile_sigma, 'string',handles.param.tip_profile_sigma);
+set(handles.txt_tip_profile_length, 'string',handles.param.tip_profile_length);
 
 set(handles.pop_spk_method, 'Value',find(strcmp(handles.options.spk_method,handles.param.spk_method)))
 set(handles.sld_spk_threshold, 'Min', 0, 'Max', 1, 'SliderStep', [1/100 1/10], 'Value', handles.param.spk_threshold);
@@ -1069,9 +1086,10 @@ handles.param.filter_median = 7;
 % tip trace
 handles.param.tip_trace_distance = 50;
 % tip profile
-handles.param.profile_erode = 5;
-handles.param.profile_sigma = 1;
-handles.param.profile_length = 50;
+handles.param.tip_profile_method = 'nearest';
+handles.param.tip_profile_erode = 5;
+handles.param.tip_profile_sigma = 1;
+handles.param.tip_profile_length = 50;
 % spitzenkorper detection
 handles.param.spk_method = 'template';
 handles.param.spk_threshold = 0.25;
@@ -2004,7 +2022,14 @@ set(handles.sld_segment_threshold, 'Value',level)
 set(handles.txt_segment_threshold, 'String',level)
 
 function txt_tip_filter_noise_Callback(hObject, eventdata, handles)
+handles.param.filter_noise = str2double(get(hObject, 'String'));
+guidata(gcbo, handles);
+fnc_param_save(handles)
+
 function txt_tip_filter_median_Callback(hObject, eventdata, handles)
+handles.param.filter_median = str2double(get(hObject, 'String'));
+guidata(gcbo, handles);
+fnc_param_save(handles)
 
 function btn_segment_Callback(hObject, eventdata, handles)
 set(handles.stt_status,'string', 'Segmenting images. Please wait...');drawnow;
@@ -2134,11 +2159,11 @@ end
 % --------------------------------------------------------------------------
 
 function btn_select_Callback(hObject, eventdata, handles)
-set(handles.stt_status,'string', 'Segmenting images. Please wait...');drawnow;
+set(handles.stt_status,'string', 'Selection of hyphal tips for analysis');drawnow;
 % reset the tip table
 set(handles.uit_tip,'data',{0,0,0,false})
 % clear the results array
-handles.tip_results = [];
+handles.tip_table = [];
 handles = fnc_select(handles);
 % set(handles.pop_display_image, 'Value', find(strcmpi(get(handles.pop_display_image, 'String'), 'selected')));
 % handles = fnc_display_image(handles);
@@ -2158,15 +2183,17 @@ im = medfilt2(im,[7 7]);
 handles.images.test = im;
 set(handles.pop_display_image, 'Value', find(strcmpi(get(handles.pop_display_image, 'String'), 'test')));
 handles = fnc_display_image(handles);
-set(handles.stt_status,'string', ['Please select the hyphae for analysis...']);drawnow;
+set(handles.stt_status,'string', ['Please select the hyphal tips for analysis.... Right click to finish']);drawnow;
 but = 1;
 n = 0;
 while but == 1
     n = n+1;
-    [x(n,1), y(n,1), but] = myginput(1, 'crosshair');
+    [xp,yp, but] = myginput(1, 'crosshair');
     if but == 3
         break
     end
+    x(n,1) = xp;
+    y(n,1) = yp;
     hold on
     plot(x(n,1),y(n,1),'m*')
 end
@@ -2179,7 +2206,9 @@ set(handles.stt_status,'string', 'Selection complete');drawnow;
 % --------------------------------------------------------------------------
 
 function txt_tip_trace_distance_Callback(hObject, eventdata, handles)
-set(handles.tip_profile_controls,'enable','off');
+handles.param.tip_trace_distance = str2double(get(hObject, 'String'));
+guidata(gcbo, handles);
+fnc_param_save(handles)
 
 function btn_tip_reset_Callback(hObject, eventdata, handles)
 handles.tip_results = [];
@@ -2201,9 +2230,8 @@ set(handles.pop_display_image, 'Value', find(strcmpi(get(handles.pop_display_ima
 set(handles.pop_display_merge, 'Value', find(strcmpi(get(handles.pop_display_merge, 'String'), 'subtracted')));
 set(handles.chk_display_merge, 'Value',1)
 handles = fnc_display_image(handles);
-set(handles.stt_status,'string', 'Tips located complete');drawnow;
+set(handles.stt_status,'string', 'Tip extraction complete');drawnow;
 set(handles.tip_profile_controls,'enable','on');
-
 
 function handles = fnc_tip_extract(handles)
 options = get(handles.pop_tip_trace_channel, 'string');
@@ -2212,6 +2240,9 @@ iC = str2double(options{options_idx});
 iZ = get(handles.sld_Z, 'Value');
 handles.images.midline = false(size(handles.images.segmented));
 handles.images.tip = zeros(size(handles.images.segmented));
+handles.images.boundary = zeros(size(handles.images.segmented));
+handles.images.boundary_D = zeros(size(handles.images.segmented));
+handles.images.boundary_FM = zeros(size(handles.images.segmented));
 % get parameters
 handles.param.trace_distance = str2double(get(handles.txt_tip_trace_distance, 'String'));
 % % convert the distance to microns
@@ -2230,12 +2261,17 @@ distance = handles.param.trace_distance;
 % keep a log of whether a tip has been identified for each hypha in
 % each time point
 tip_log = false(handles.nT,nH);
+% set up the results table
+% T = table({'filename'},0,0,0,0,0,[0,0],{[0 0]},0,'VariableNames',{'filename','T','Z','C','ID','active','endpoint','boundary','rmax'})
+handles.tip_table = [];
 % start with the tip co-ordinates manually selected
 x = handles.tip_selected_points(:,1);
 y = handles.tip_selected_points(:,2);
 % loop through each image
 for iT = 1:handles.nT
     set(handles.stt_status,'string', ['Extracting the tip for image ' num2str(iT) '. Please wait...']);drawnow;
+    % set up an accumulator image for the boundaries
+    boundary_im = zeros(size(handles.images.segmented,1),size(handles.images.segmented,2));
     % increment the sliders and display the new image
     set(handles.sld_T,'Value',iT)
     set(handles.txt_T,'String',iT)
@@ -2253,7 +2289,7 @@ for iT = 1:handles.nT
         tip_ID = bwlabel(tip_all);
     end
     % calculate the distance transform
-    D = bwdist(~hypha_all, 'Euclidean');
+    [D,FM] = bwdist(~hypha_all, 'Euclidean');
     if iT == 1
         % get the maximum radius present from the distance transform
         rmax = double(round(max(D(:))));
@@ -2278,18 +2314,11 @@ for iT = 1:handles.nT
     x = m(ia,1);
     y = m(ia,2);
     v = m(ia,3);
-%         % remove points that are less than the trace distance away from
-%     % the boundary of the image
-%     idx = x<rmax | y<rmax | y>size(ep,1)-rmax | x>size(ep,2)-rmax;
-% x(idx) = [];
-% y(idx) = [];
-% v(idx) = [];
     % loop through each hyphae
-    cols = {'r','g','b','c','m','y','k','w'};
+    cols = repmat({'r','g','b','c','m','y','w'},1,10);
     for iH = 1:length(v)
-            % display the selected points
-    plot(handles.ax_image,x(iH),y(iH),'Marker','o','MarkerFaceColor',cols{iH})
-
+        % display the selected points
+        plot(handles.ax_image,x(iH),y(iH),'Marker','o','MarkerFaceColor',cols{iH},'MarkerEdgeColor','k','MarkerSize',3)
         % get the specific hypha
         tip = bwselect(tip_all,x(iH),y(iH));
         if any(tip(:))
@@ -2310,27 +2339,37 @@ for iT = 1:handles.nT
             boundary = [boundary;boundary(1,:)];
             % the start and end points of the trace boundary will be the maximum
             % difference in a circularised set of pixel co-ordinates
-            [~,idx1] = max(abs(diff(hypot(boundary(:,1),boundary(:,2)))));
+            [~,idx1] = max(abs(hypot(diff(boundary(:,1)),diff(boundary(:,2)))));
             % shift the boundary co-ordinates to start at index 1
             boundary = circshift(boundary(1:end-1,:),-idx1,1);
-            % update the results
-            handles.tip_results{v(iH),iT}.boundary = boundary;
-            handles.tip_results{v(iH),iT}.rmax = rmax;
-            handles.tip_results{v(iH),iT}.endpoint = [y(iH),x(iH)];
+            % create a boundary image with the tip ID
+            B_idx = sub2ind(size(tip),boundary(:,1),boundary(:,2));
+            boundary_im(B_idx) = iH;
+            % get the euclidean distance along the boundary
+            B_length = cumsum([0; hypot(diff(boundary(:,1)),diff(boundary(:,2)))]);
             % set the new tip image to the label value of the current hypha
             tip_ID(tip) = iH;
             h = plot(handles.ax_image,boundary(:,2), boundary(:,1), 'c:', 'LineWidth', 0.75);
             set(h, 'Tag','tip_boundary')
-        else
-            %             handles.tip_results{v(iH),iT}.boundary = [];
-            %             handles.tip_results{v(iH),iT}.dc = [];
-            %             handles.tip_results{v(iH),iT}.endpoint = [];
+                        % update the results
+            T = table({handles.fname},iT,iZ,iC,iH,1,[y(iH),x(iH)],{boundary},{B_idx},{B_length},rmax,'VariableNames',{'filename','T','Z','C','ID','active','endpoint','boundary','B_idx','B_length','rmax'});
+             handles.tip_table = [handles.tip_table; T];
         end
     end
+    % update the images
     handles.images.midline(:,:,iC,iZ,iT) = bw_midline;
     handles.images.tip(:,:,iC,iZ,iT) = tip_ID;
+    handles.images.boundary(:,:,iC,iZ,iT) = boundary_im;
+    % calculate the internal distance transform and feature map for all tips, with
+    % masking by the tip image
+     mask = double(tip_ID>0) ;
+    [DB,FMB] = bwdist(boundary_im,'Euclidean');
+    handles.images.boundary_D(:,:,iC,iZ,iT) = DB.*mask;
+    handles.images.boundary_FM(:,:,iC,iZ,iT)  = double(FMB).*mask;
 end
-% the final tip image is saved as selected
+% set the active status of points that are less than the trace distance away from
+% the boundary of the image to zero
+handles.tip_table.active = handles.tip_table.endpoint(:,1)>rmax & handles.tip_table.endpoint(:,2)>rmax & handles.tip_table.endpoint(:,1)<size(tip_ID,1)-rmax | handles.tip_table.endpoint(:,1)>size(tip_ID,2)-rmax;
 handles.images.selected = max(handles.images.tip, [], 5);
 % update the tip table
 ID = 1:nH;
@@ -2364,6 +2403,8 @@ set(handles.stt_status,'string', 'Tracing tips. Please wait...');drawnow;
 set(handles.tip_profile_controls,'enable','on');
 handles = fnc_tip_trace(handles);
 guidata(gcbo, handles);
+handles = fnc_tip_coordinate_system(handles);
+guidata(gcbo, handles);
 % % % % update the thumbnails
 % % % handles.thumbnails.midline = fnc_thumbnail_make(handles.images.midline(:,:,1,1,round(handles.nT/2)), 'midline',handles);
 % % % handles = fnc_thumbnail_display('midline',handles);
@@ -2376,100 +2417,124 @@ handles = fnc_display_image(handles);
 set(handles.stt_status,'string', 'Tip tracing complete');drawnow;
 set(handles.tip_profile_controls,'enable','on');
 
-
 function handles = fnc_tip_trace(handles)
-% find the number of hyphae that have been selected
-nH = max(handles.images.selected(:));
-% loop through each hyphae
-for iH = 1:nH
-    % loop through each image
-    for iT = 1:handles.nT
-        % check that a tip is selected for analysis and is present for this hypha at this time point
-        if handles.TipIdx(iH) && size(handles.tip_results,2) >=iT && ~isempty(handles.tip_results{iH,iT}) && isfield(handles.tip_results{iH,iT}, 'endpoint')
-            rmax = handles.tip_results{iH,iT}.rmax;
-            boundary = handles.tip_results{iH,iT}.boundary;
-            dc = round(rmax.*0.75); % use an approximate 45 degree separation for the test points of the osculating circle
-            
-            
-            % set up the output arrays
-            R = ones(size(c,1),1)*inf; % radius
-            K = zeros(size(c,1),1); % curvature
-            C = ones(size(c,1),2)*inf; % center
-            nc = length(c);
-            % loop through pixels on the contour, starting and finishing one chord
-            % length away from the endpoints
-            for i=dc+1:nc-dc
-                cm = i; % the mid point
-                cl = cm - dc; % the lefthand marker index
-                cr = cm + dc; % the righthand marker index
-                pi_k  = boundary(cm,:); % the mid point pixel co-ordinates
-                pi_kb = boundary(cl,:); % the lefthand pixel co-ordinates
-                pi_kf = boundary(cr,:); % the righthand pixel co-ordinates
-                % calculation of coefficients for the implicit equation of a line normal to the tangent between the midpoint and the left and right markers
-                [a1,b1,c1] = points_bisect_line_imp_2d(pi_k,pi_kb);
-                [a2,b2,c2] = points_bisect_line_imp_2d(pi_k,pi_kf);
-                % calculation of the intersection point between the two normals
-                [ival,center] = lines_imp_int_2d(a1,b1,c1,a2,b2,c2);
-                % ival reports whether a unique intersection point is found
-                if ival==1
-                    vector = pi_k-center;
-                    radius = norm(vector);
-                    R(i) = radius;
-                    K(i) = 1/radius;
-                    C(i,:) = center;
-                end
-            end
-            
-            %[R,K,C] = BOCurvatureEstimationByOsculatingCircle2D(boundary,dc);
-            % select the tip region if present
-            tip = handles.images.tip(:,:,1,1,iT)==iH;
-            if any(tip(:))
-                % find centers within the tip
-                [r,c] = find(tip);
-                idxIn = ismember(round(C),[r,c],'rows');
-                if any(idxIn)
-                    % find the smallest radius and center for circles within the tip region
-                    Rmin = min(R(idxIn));
-                    % if there is more than one with the same radius, pick
-                    % the first one
-                    idx = find(R==Rmin,1);
-                    radius = R(idx);
-                    center = C(idx,:);
-                    %
-                    cs = length(handles.tip_results{iH,iT}.boundary);
-                    cm = idx;
-                    cl = cm - dc;
-                    cr = cm + dc;
-                    if cl<1;  cl = cs - abs(cl); end
-                    if cr>cs; cr = cr - cs;      end
-                    % % find the start of the tip region from the point where the curvature is
-                    % % within 120% of rmax
-                    %                     idxR = R<(rmax+0.2*rmax)
-                    %                     % this gets the linear index of centers that fulfill
-                    %                     % the radius constraint and are within the hypha
-                    %                     idxR = find(idxR & idxIn);
-                    %                     % tip zone end
-                    %                 p1 = find(idxR,1,'first');
-                    %                 p2 = find(idxR,1,'last');
-                    p1 = find(idxIn,1,'first');
-                    p2 = find(idxIn,1,'last');
-                    
-                    % this gets the first and last centers and calculates their average
-                    % co-ordinates as a way to define the center of the tip as opposed to the
-                    % center of the osculating circle
-                    zone = (handles.tip_results{iH,iT}.boundary(p1,:)+handles.tip_results{iH,iT}.boundary(p2,:))./2;
-                    % update the results structure
-                    handles.tip_results{iH,iT}.center = center;
-                handles.tip_results{iH,iT}.radius = radius;
-                handles.tip_results{iH,iT}.cm = cm;
-                handles.tip_results{iH,iT}.cr = cr;
-                handles.tip_results{iH,iT}.cl = cl;
-                handles.tip_results{iH,iT}.zone = zone;
-                end
-            end
+% only trace active tips
+idxA = find(handles.tip_table.active);
+for iH = 1:length(idxA)
+    iT = handles.tip_table.T(idxA(iH));
+    iZ = handles.tip_table.Z(idxA(iH));
+    iC = handles.tip_table.C(idxA(iH));
+    ID = handles.tip_table.ID(idxA(iH));
+    rmax = handles.tip_table.rmax(idxA(iH));
+    boundary = handles.tip_table.boundary{idxA(iH)};
+    dc = round(rmax.*0.5); % use an approximate 45 degree separation for the test points of the osculating circle
+    % set up the output arrays
+    R = ones(size(boundary,1),1)*inf; % radius
+    K = zeros(size(boundary,1),1); % curvature
+    C = ones(size(boundary,1),2)*inf; % center
+    nc = length(boundary);
+    % loop through pixels on the contour, starting and finishing one chord
+    % length away from the endpoints
+    for i=dc+1:nc-dc
+        cm = i; % the target pixel
+        cl = cm - dc; % the lefthand marker index
+        cr = cm + dc; % the righthand marker index
+        pi_k  = boundary(cm,:); % the target pixel co-ordinates
+        pi_kb = boundary(cl,:); % the lefthand pixel co-ordinates
+        pi_kf = boundary(cr,:); % the righthand pixel co-ordinates
+        % calculation of coefficients for the implicit equation of a line normal to the tangent between the midpoint and the left and right markers
+        [a1,b1,c1] = points_bisect_line_imp_2d(pi_k,pi_kb);
+        [a2,b2,c2] = points_bisect_line_imp_2d(pi_k,pi_kf);
+        % calculation of the intersection point between the two normals
+        [ival,center] = lines_imp_int_2d(a1,b1,c1,a2,b2,c2);
+        % ival reports whether a unique intersection point is found
+        if ival==1
+            vector = pi_k-center;
+            radius = norm(vector);
+            R(i) = radius;
+            K(i) = 1/radius;
+            C(i,:) = center;
         end
     end
+    % select the tip region
+    tip = handles.images.tip(:,:,iC,iZ,iT)==ID;
+    % find centers within the tip
+    [r,c] = find(tip);
+    idxIn = ismember(round(C),[r,c],'rows');
+    if any(idxIn)
+        % find the smallest radius and center for circles within the tip region
+        Rmin = min(R(idxIn));
+        % if there is more than one with the same radius, pick
+        % the first one
+        idx = find(R==Rmin,1);
+        radius = R(idx);
+        center = C(idx,:);
+        % update the osculating circle markers for the circle with the
+        % smallest radius
+        cs = length(boundary);
+        cm = idx;
+        cl = cm - dc;
+        cr = cm + dc;
+        if cl<1;  cl = cs - abs(cl); end
+        if cr>cs; cr = cr - cs;      end
+        % find the start of the tip region from the point where the curvature is
+        % within 120% of rmax
+        idxR = R<(rmax+10.5*rmax) & idxIn;
+        % this gets the linear index of centers that fulfill
+        % the radius constraint and are within the hypha
+        idxR = find(idxR);
+        % tip zone end
+        p1 = find(idxR,1,'first');
+        p2 = find(idxR,1,'last');
+        % this gets the first and last centers and calculates their average
+        % co-ordinates as a way to define the center of the tip as opposed to the
+        % center of the osculating circle
+        zone = (boundary(idxR(p1),:)+boundary(idxR(p2),:))./2;
+        % adjust the length to run positive and negative from the apex
+        handles.tip_table.B_length{idxA(iH)} = handles.tip_table.B_length{idxA(iH)} - handles.tip_table.B_length{idxA(iH)}(cm);
+        %  update the results table
+        handles.tip_table.center(idxA(iH),1:2) = center;
+        handles.tip_table.radius(idxA(iH)) = radius;
+        handles.tip_table.apex(idxA(iH),1:2) = boundary(cm,:);
+        handles.tip_table.OCr(idxA(iH),1:2) = boundary(cr,:);
+        handles.tip_table.OCl(idxA(iH),1:2) = boundary(cl,:);
+        handles.tip_table.zone(idxA(iH),1:2) = zone;
+    end
 end
+
+% --------------------------------------------------------------------------
+% TIP CO-ORDINATE SYSTEMS
+% --------------------------------------------------------------------------
+
+function handles = fnc_tip_coordinate_system(handles)
+handles.images.axial = zeros(size(handles.images.subtracted));
+handles.images.radial = zeros(size(handles.images.subtracted));
+for iT = 1:handles.nT
+    set(handles.stt_status, 'String',['Calculating co-ordinate system for image ' num2str(iT) '.Please wait...'])
+    % create a geodesic distance transform image from each apex,
+    % constrained by the hyphal boundary, to get the axial co-ordinates
+    temp = false(size(handles.images.subtracted,1),size(handles.images.subtracted,2));
+    apex = handles.tip_table.apex(handles.tip_table.T == iT,:);
+    % check whether tips are active
+    active = handles.tip_table.active(handles.tip_table.T == iT,:);
+    idx = sub2ind(size(temp),apex(active,1),apex(active,2));
+    temp(idx) = 1;
+    handles.images.axial(:,:,1,1,iT) = bwdistgeodesic(handles.images.segmented(:,:,1,1,iT),temp,'quasi-euclidean');
+    % create a complete midline to the apex
+    midline = handles.images.midline(:,:,1,1,iT);
+    endpoints = handles.tip_table.endpoint(handles.tip_table.T == iT,:);
+    for iB = 1:size(apex,1)
+        if active(iB)
+            [r,c] = bresenham(apex(iB,1),apex(iB,2),endpoints(iB,1),endpoints(iB,2));
+            idx = sub2ind(size(midline),r,c);
+            midline(idx) = 1;
+        end
+    end
+    % Create the geodesic distance transform from the extended midline, constrained by the hyphal boundary, to
+    % get the radial co-ordinates
+    handles.images.radial(:,:,1,1,iT) = bwdistgeodesic(handles.images.segmented(:,:,1,1,iT),midline,'quasi-euclidean');
+end
+    set(handles.stt_status, 'String','Co-ordinate system complete')
 
 
 % --------------------------------------------------------------------------
@@ -2477,18 +2542,347 @@ end
 % --------------------------------------------------------------------------
 
 function txt_tip_profile_erode_Callback(hObject, eventdata, handles)
+handles.param.tip_profile_erode = str2double(get(hObject, 'String'));
+guidata(gcbo, handles);
+fnc_param_save(handles)
+
 function txt_tip_profile_sigma_Callback(hObject, eventdata, handles)
+handles.param.tip_profile_sigma = str2double(get(hObject, 'String'));
+guidata(gcbo, handles);
+fnc_param_save(handles)
+
 function txt_tip_profile_length_Callback(hObject, eventdata, handles)
+handles.param.tip_profile_length = str2double(get(hObject, 'String'));
+guidata(gcbo, handles);
+fnc_param_save(handles)
+
+
+function pop_tip_profile_method_Callback(hObject, eventdata, handles)
+
 
 function btn_tip_profile_Callback(hObject, eventdata, handles)
 handles = fnc_tip_profile(handles);
 guidata(gcbo, handles);
 set(handles.stt_status,'string', ['Profiles complete']);drawnow;
 fnc_tip_plot_profile(handles.ax_image,handles);
-fnc_tip_plot_graph(handles);
-fnc_tip_profile_image(handles);
+% fnc_tip_plot_graph(handles);
+% fnc_tip_profile_image(handles);
+
 
 function handles = fnc_tip_profile(handles)
+fnc_clear_overlays(handles)
+% get parameters
+options = get(handles.pop_tip_profile_method, 'string');
+options_idx = get(handles.pop_tip_profile_method, 'value');
+method = options{options_idx};
+p_erode = str2double(get(handles.txt_tip_profile_erode, 'String'));
+p_sigma = str2double(get(handles.txt_tip_profile_sigma, 'String'));
+p_length = str2double(get(handles.txt_tip_profile_length, 'String'));
+% get the length in microns
+% p_length = handles.param.profile_length./handles.param.pixel_size(1);
+% mask the distance transform and feature map by the region
+switch method
+    case 'nearest'
+        for iT = 1:handles.nT
+            % get the intensity, boundary and tip images for this time point
+            im = handles.images.subtracted(:,:,1,1,iT);
+            boundary = handles.images.boundary(:,:,1,1,iT);
+            tip = handles.images.tip(:,:,1,1,iT);
+            % calculate a mask from the boundary distance spanning the distance
+            % over which to aggregate pixel intensities
+            mask = handles.images.boundary_D(:,:,1,1,iT)<=p_erode;
+            % apply the mask to the Feature Map to extract the nearest pixel index on the
+            % boundary for each pixel to be aggregated
+            FM = handles.images.boundary_FM(:,:,1,1,iT);
+            FMidx = FM(mask);
+            % extract the non-zero values as a vector
+            idx = FMidx==0;
+            FMidx(idx) = [];
+            % extract the intensity value from the background subtracted image
+            V = im(mask);
+            V(idx) = [];
+            % extract the tip ID from the boundary image
+            ID = boundary(FMidx);
+            % loop through each hypha
+            for iH = 1:max(ID)
+                % extract each hypha in turn
+                Hidx = ID == iH;
+                % calculate the group statistics for each profile (initially
+                % ordered by linear pixel index)
+                [mn,mx,n] = grpstats(V(Hidx),FMidx(Hidx),{'mean','max','numel'});
+                % get the row index into the main results table
+                r = handles.tip_table.T == iT & handles.tip_table.ID == iH;
+                if ~isempty(r) && handles.tip_table.active(r) == 1 && ~isempty(handles.tip_table.radius(r))
+                    % get the conversion between linear index and position around
+                    % the boundary
+                    [~,B_idx] = sort(handles.tip_table.B_idx{r});
+                    [~,B_order] = sort(B_idx);
+                    % update the table with the results, re-ordered to match the
+                    % boundary sequence order
+                    mn = mn(B_order);
+                    mx = mx(B_order);
+                    n = n(B_order);
+                    % resample a fixed distance from the apex along each arm and
+                    % update the results table
+                    x = linspace(-p_length,p_length,p_length*2+1);
+                    handles.tip_table.B_mean{r} = interp1(handles.tip_table.B_length{r},mn,x)';
+                    handles.tip_table.B_max{r} = interp1(handles.tip_table.B_length{r},mx,x)';
+                    handles.tip_table.B_n{r} = interp1(handles.tip_table.B_length{r},n,x)';
+                    [F,GoF] = fnc_tip_profile_fit(x,handles.tip_table.B_max{r},handles.tip_table.B_n{r});
+                    % get the index of the peak into the boundary array
+                    [~,Pidx] = min(abs(handles.tip_table.B_length{r}-F.b1));
+                    handles.tip_table.peak_value(r) = F.a1;
+                    handles.tip_table.peak_displacement(r) = F.b1;
+                    handles.tip_table.peak_coordinates(r,1:2) = handles.tip_table.boundary{r}(Pidx,:);
+                    handles.tip_table.peak_width(r) = F.c1;
+                    handles.tip_table.peak_offset(r) = F.d1;
+                    handles.tip_table.peak_GoF{r} = GoF;
+                    handles.tip_table.peak_ci{r} = confint(F);
+                end
+                if iT == 1
+                    figure
+                    plot(F,x',handles.tip_table.B_max{r},double(handles.tip_table.B_n{r})<=2)
+                end
+            end
+        end
+    case 'erode'
+        % only trace active tips
+        idxA = find(handles.tip_table.active);
+        for iH = 1:length(idxA)
+            iT = handles.tip_table.T(idxA(iH));
+            iZ = handles.tip_table.Z(idxA(iH));
+            iC = handles.tip_table.C(idxA(iH));
+            ID = handles.tip_table.ID(idxA(iH));
+            rmax = handles.tip_table.rmax(idxA(iH));
+            boundary = handles.tip_table.boundary{idxA(iH)};
+            set(handles.stt_status,'string', ['Extracting the profile for image ' num2str(iT) ' of tip ' num2str(iH) '. Please wait...']);drawnow;
+            apex = handles.tip_table(idxA(iH)).apex;
+            hypha_all = handles.images.segmented(:,:,iC,iZ,iT);
+            tip = handles.images.tip(:,:,1,1,iT)==iH;
+            % find profile
+            [cr,cl,nr,nl,xce,yce,imthe] = BOPlantTipProfile2D(squeeze(hypha_all),tip,boundary,apex,p_length,p_erode);
+%             handles.tip_results{iH,iT}.xce = xce;
+%             handles.tip_results{iH,iT}.yce = yce;
+%             handles.tip_results{iH,iT}.crp = cr;
+%             handles.tip_results{iH,iT}.clp = cl;
+            % Distance
+            imthm = squeeze(hypha_all);
+            imthm(imthe) = 0;
+            imd = bwdist(imthm,'Euclidean');
+            imf = squeeze(handles.images.subtracted(:,:,iC,iZ,iT));
+            % convert the co-ordinates to physical length
+            d = diff(cr);
+            dr = cumsum(hypot(d(:,1),d(:,2)));
+            d = diff(cl);
+            dl = cumsum(hypot(d(:,1),d(:,2)));
+            % reorder and join the left and right profiles
+            xp = [-flipud(dl); 0; dr];
+            % convert to microns
+            xp = xp.*handles.param.pixel_size(1);
+            yp = zeros(nl+nr-1,1);
+            ypd = zeros(nl+nr-1,1);
+            boundary = zeros(nl+nr-1,2);
+            for j=1:nl
+                yp(j) = imf(cl(nl-j+1,1),cl(nl-j+1,2));
+                ypd(j) = imd(cl(nl-j+1,1),cl(nl-j+1,2));
+                boundary(j,1) = cl(nl-j+1,1);
+                boundary(j,2) = cl(nl-j+1,2);
+            end
+            for j=2:nr
+                yp(j+nl-1) = imf(cr(j,1),cr(j,2));
+                ypd(j+nl-1) = imd(cr(j,1),cr(j,2));
+                boundary(j+nl-1,1) = cr(j,1);
+                boundary(j+nl-1,2) = cr(j,2);
+            end
+            % Interpolate
+            limit = max(abs(xp));
+            res = limit/p_length;
+            xp2 = (-limit:res:limit)';
+            yp2 = interp1(xp,yp,xp2,'linear','extrap');
+            ypd2 = interp1(xp,ypd,xp2,'linear','extrap');
+            xp = xp2; yp = yp2; ypd = ypd2;
+            ci = 1:(size(boundary,1)-1)/(size(xp,1)-1):size(boundary,1);
+            cp(:,1) = interp1(1:size(boundary,1),boundary(:,1),ci);
+            cp(:,2) = interp1(1:size(boundary,1),boundary(:,2),ci);
+            % Calculate profile line parameters
+            [a1,a2,a3,a4,cfun,er] = BOCurvilinearStructureProfileParameters2D(xp,yp);
+            % Calculate estimated profile coordinaties
+%             ypfit = feval(cfun,xp);
+            % update the results
+%             handles.tip_results{iH,iT}.fit_coefficients = [a1,a2,a3,a4];
+%             handles.tip_results{iH,iT}.er = struct2array(er);
+%             handles.tip_results{iH,iT}.coords = [xp yp ypd];
+%             handles.tip_results{iH,iT}.cp = cp;
+%             handles.tip_results{iH,iT}.ypfit = ypfit;
+handles.tip_table.peak_value(iH) = a1;
+handles.tip_table.peak_displacement(iH) = a2;
+handles.tip_table.peak_coordinates(iH,1:2) = handles.tip_table.boundary{r}(Pidx,:);
+handles.tip_table.peak_width(iH) = a3;
+handles.tip_table.peak_offset(iH) = a4;
+handles.tip_table.peak_GoF{iH} = er;
+handles.tip_table.peak_ci{iH} = confint(cfun);
+        end
+end
+
+function [F, GoF] = fnc_tip_profile_fit(x,y,n)
+% fit a gaussian with a constant baseline
+equ = 'a1*exp(-((x-b1)/c1)^2)+d1';
+model = fittype(equ);
+% set up the fitoptions for a gaussian and augment them with the
+% limits and starting values
+fit_options = fitoptions('gauss1');
+fit_options.StartPoint = [1 0 10 0.1];
+fit_options.Lower = [0 -Inf 0 0];
+% weight the values by the number of points asociated with each boundary pixel
+fit_options.Weights = double(n);
+% exclude boundary pixels with less than 2 associated points
+fit_options.Exclude = double(n)<=3;
+[F,GoF] = fit(x',double(y),model,fit_options);
+
+
+                %                 % fit two gaussian with a constant baseline
+                %         equ = 'a1*exp(-((x-b1)/c1)^2)+a2*exp(-((x-b2)/c2)^2)+d1';
+                %         model = fittype(equ)
+                %         % set up the fitoptions for a gaussian and augment them with the
+                %         % limits and starting values
+                %         fit_options = fitoptions('gauss2');
+                %         fit_options.StartPoint = [1 1 0 0 10 10 0.1];
+                %         fit_options.Lower = [0 0 -Inf -Inf 0 0 0];
+                %         % weight the values by the number of points asociated with each boundary pixel
+                %         fit_options.Weights = double(handles.tip_table.B_n{r});
+                %         % exclude boundary pixels with less than 2 associated points
+                %         fit_options.Exclude = double(handles.tip_table.B_n{r})<=2;
+                %         [F,GoF] = fit(double(handles.tip_table.B_length{r}),double(handles.tip_table.B_max{r}),model,fit_options);
+                %         GoF
+                %         figure
+                %         plot(F,handles.tip_table.B_length{r},handles.tip_table.B_max{r},double(handles.tip_table.B_n{r})<=2)
+           
+
+function handles = fnc_tip_profile2(handles)
+fnc_clear_overlays(handles)
+% get parameters
+p_erode = str2double(get(handles.txt_tip_profile_erode, 'String'));
+p_sigma = str2double(get(handles.txt_tip_profile_sigma, 'String'));
+p_length = str2double(get(handles.txt_tip_profile_length, 'String'));
+% get the length in microns
+% p_length = handles.param.profile_length./handles.param.pixel_size(1);
+% mask the distance transform and feature map by the region
+for iT = 1:1;%handles.nT
+    % get the intensity and images for each time point
+    im = handles.images.subtracted(:,:,1,1,iT);
+    boundary = handles.images.boundary(:,:,1,1,iT);
+    % calculate a mask from the boundary distance spanning the distance
+    % over which to aggregate pixel intensities
+    mask = handles.images.boundary_D(:,:,1,1,iT)<=p_erode;
+    % apply the mask to the Feature Map to extract the nearest pixel index on the
+    % boundary for each pixel to be aggregated
+    FM = handles.images.boundary_FM(:,:,1,1,iT);
+    FMidx = FM(mask);
+    % extract the non-zero values as a vector
+    idx = FMidx==0;
+    FMidx(idx) = [];
+    % extract the intensity value from the background subtracted image
+    V = im(mask);
+    V(idx) = [];
+    % extract the tip ID from the boundary image
+    ID = boundary(FMidx);
+    %     % construct a data array
+    %     T = repmat(iT,length(V),1);
+    for iH = 1:max(ID)
+        % run through each hypha in turn
+        idx = ID == iH;
+        % calculate the group statistics for each profile (initially
+        % ordered by linear pixel index)
+        [mn,mx,n] = grpstats(V(idx),FMidx(idx),{'mean','max','numel'});
+        % get the row index into the main results table
+        r = handles.tip_table.T == iT & handles.tip_table.ID == iH;
+        % update the table with the results, re-ordered to match the
+        % boundary sequence order
+        handles.tip_table.B_mean{r} = mn(handles.tip_table.B_order{r});
+        handles.tip_table.B_max{r} = mx(handles.tip_table.B_order{r});
+        handles.tip_table.B_n{r} = n(handles.tip_table.B_order{r});
+        % fit a gaussian
+        F = fit(cumsum(handles.tip_table.B_length{r}),handles.tip_table.B_max{r},'gauss1','Weights',handles.tip_table.B_n{r});
+        figure
+        plot(F,cumsum(handles.tip_table.B_length{r}),handles.tip_table.B_max{r})
+        hold on
+    end
+end
+
+% only trace active tips
+idxA = find(handles.tip_table.active);
+for iH = 1:length(idxA)
+    iT = handles.tip_table.T(idxA(iH));
+    iZ = handles.tip_table.Z(idxA(iH));
+    iC = handles.tip_table.C(idxA(iH));
+    ID = handles.tip_table.ID(idxA(iH));
+    rmax = handles.tip_table.rmax(idxA(iH));
+    boundary = handles.tip_table.boundary{idxA(iH)};
+    
+    set(handles.stt_status,'string', ['Extracting the profile for image ' num2str(iT) ' of tip ' num2str(iH) '. Please wait...']);drawnow;
+    cm = handles.tip_results{iH,iT}.cm;
+    boundary = handles.tip_results{iH,iT}.boundary;
+    hypha_all = handles.images.segmented(:,:,iC,iZ,iT);
+    tip = handles.images.tip(:,:,1,1,iT)==iH;
+    % find profile
+    [cr,cl,nr,nl,xce,yce,imthe] = BOPlantTipProfile2D(squeeze(hypha_all),tip,boundary,cm,p_length,p_erode);
+    handles.tip_results{iH,iT}.xce = xce;
+    handles.tip_results{iH,iT}.yce = yce;
+    handles.tip_results{iH,iT}.crp = cr;
+    handles.tip_results{iH,iT}.clp = cl;
+    % Distance
+    imthm = squeeze(hypha_all);
+    imthm(imthe) = 0;
+    imd = bwdist(imthm,'Euclidean');
+    imf = squeeze(handles.images.subtracted(:,:,iC,iZ,iT));
+    % convert the co-ordinates to physical length
+    d = diff(cr);
+    dr = cumsum(hypot(d(:,1),d(:,2)));
+    d = diff(cl);
+    dl = cumsum(hypot(d(:,1),d(:,2)));
+    % reorder and join the left and right profiles
+    xp = [-flipud(dl); 0; dr];
+    % convert to microns
+    xp = xp.*handles.param.pixel_size(1);
+    yp = zeros(nl+nr-1,1);
+    ypd = zeros(nl+nr-1,1);
+    boundary = zeros(nl+nr-1,2);
+    for j=1:nl
+        yp(j) = imf(cl(nl-j+1,1),cl(nl-j+1,2));
+        ypd(j) = imd(cl(nl-j+1,1),cl(nl-j+1,2));
+        boundary(j,1) = cl(nl-j+1,1);
+        boundary(j,2) = cl(nl-j+1,2);
+    end
+    for j=2:nr
+        yp(j+nl-1) = imf(cr(j,1),cr(j,2));
+        ypd(j+nl-1) = imd(cr(j,1),cr(j,2));
+        boundary(j+nl-1,1) = cr(j,1);
+        boundary(j+nl-1,2) = cr(j,2);
+    end
+    % Interpolate
+    limit = max(abs(xp));
+    res = limit/p_length;
+    xp2 = (-limit:res:limit)';
+    yp2 = interp1(xp,yp,xp2,'linear','extrap');
+    ypd2 = interp1(xp,ypd,xp2,'linear','extrap');
+    xp = xp2; yp = yp2; ypd = ypd2;
+    ci = 1:(size(boundary,1)-1)/(size(xp,1)-1):size(boundary,1);
+    cp(:,1) = interp1(1:size(boundary,1),boundary(:,1),ci);
+    cp(:,2) = interp1(1:size(boundary,1),boundary(:,2),ci);
+    % Calculate profile line parameters
+    [a1,a2,a3,a4,cfun,er] = BOCurvilinearStructureProfileParameters2D(xp,yp);
+    % Calculate estimated profile coordinaties
+    ypfit = feval(cfun,xp);
+    % update the results
+    handles.tip_results{iH,iT}.fit_coefficients = [a1,a2,a3,a4];
+    handles.tip_results{iH,iT}.er = struct2array(er);
+    handles.tip_results{iH,iT}.coords = [xp yp ypd];
+    handles.tip_results{iH,iT}.cp = cp;
+    handles.tip_results{iH,iT}.ypfit = ypfit;
+end
+
+
+function handles = fnc_tip_profile_old(handles)
 options = get(handles.pop_tip_trace_channel, 'string');
 options_idx = get(handles.pop_tip_trace_channel, 'value');
 iC = str2double(options{options_idx});
@@ -2504,9 +2898,9 @@ p_sigma = handles.param.profile_sigma;
 p_length = handles.param.profile_length./handles.param.pixel_size(1);
 fnc_clear_overlays(handles)
 nH = max(handles.images.selected(:));
-assignin('base','tip',handles.images.tip)
-assignin('base','subtracted',handles.images.subtracted)
-assignin('base','results',handles.tip_results)
+% assignin('base','tip',handles.images.tip)
+% assignin('base','subtracted',handles.images.subtracted)
+% assignin('base','results',handles.tip_results)
 return
 for iT = 1:handles.nT
     for iH = 1:nH
@@ -2576,6 +2970,156 @@ for iT = 1:handles.nT
         end
     end
 end
+
+% -------------------------------------------------------------------------
+% SPITZENKORPER DETECTOR
+% -------------------------------------------------------------------------
+function sld_spk_threshold_Callback(hObject, eventdata, handles)
+function txt_spk_threshold_Callback(hObject, eventdata, handles)
+function chk_spk_threshold_auto_Callback(hObject, eventdata, handles)
+function txt_spk_size_Callback(hObject, eventdata, handles)
+function pop_spk_method_Callback(hObject, eventdata, handles)
+
+function btn_spk_threshold_Callback(hObject, eventdata, handles)
+options = get(handles.pop_tip_spk_channel, 'string');
+options_idx = get(handles.pop_tip_spk_channel, 'value');
+iC = str2double(options{options_idx});
+iT = round(get(handles.sld_T, 'Value'));
+iZ = round(get(handles.sld_Z, 'Value'));
+im = double(squeeze(handles.images.subtracted(:,:,iC,iZ,iT)));
+im = (im-min(im(:)))/(max(im(:))-min(im(:)));
+level = multithresh(im,2);
+set(handles.sld_spk_threshold, 'Value',level(2))
+set(handles.txt_spk_threshold, 'String',level(2))
+
+function btn_tip_spk_Callback(hObject, eventdata, handles)
+handles = fnc_tip_spk_detect(handles);
+guidata(gcbo, handles);
+
+function handles = fnc_tip_spk_detect(handles)
+options = get(handles.pop_tip_spk_channel, 'string');
+options_idx = get(handles.pop_tip_spk_channel, 'value');
+iC = str2double(options{options_idx});
+iZ = get(handles.sld_Z, 'Value');
+nH = max(handles.images.tip(:));
+options = get(handles.pop_spk_method, 'string');
+options_idx = get(handles.pop_spk_method, 'value');
+method = options{options_idx};
+axes(handles.ax_image)
+switch method
+    case 'template'
+        % set up mexican hat filter
+        scale = round(str2double(get(handles.txt_spk_size, 'String'))./handles.param.pixel_size(1));
+        ksize = scale.*3 ;%kernel needs to be 3 times bigger than the object to get the full mexican hat filter
+        pkernel = del2(-fspecial('gaussian',[ksize ksize],ksize./6.67));%sets up a mexican hat filter
+        for iH = 1:nH
+            for iT = 1:handles.nT
+                im = double(squeeze(handles.images.subtracted(:,:,iC,iZ,iT)));
+                im = (im-min(im(:)))/(max(im(:))-min(im(:)));
+                
+                
+        % get the row index into the main results table
+        r = handles.tip_table.T == iT & handles.tip_table.ID == iH;
+        if ~isempty(r) && handles.tip_table.active(r) == 1 && ~isempty(handles.tip_table.apex(r))                
+%                 if handles.TipIdx(iH) && size(handles.tip_results,2) >=iT && ~isempty(handles.tip_results{iH,iT}) && isfield(handles.tip_results{iH,iT}, 'cm')
+                    
+                    %     % only use the region within the osculating circle
+                    %     center = handles.tip_results{iH,iT}.center;
+                    %     radius = handles.tip_results{iH,iT}.radius;
+                    %     % calculate the osculating circle
+                    %     theta = linspace(0,2*pi,60);
+                    %     rho = ones(1,60)*radius;
+                    %     [xr,yr] = pol2cart(theta,rho);
+                    %     xr = xr + center(2);
+                    %     yr = yr + center(1);
+                    %     mask = poly2mask(xr,yr,size(im,1),size(im,2));
+                    %
+                    % only use the region in the selected tip
+                    % find centers within the tip
+                    tip = handles.images.tip(:,:,1,1,iT)==iH;
+                    im(~tip) = 0;%immultiply(im,tip);
+                    % calculate the distance transform from the tip
+                    dist = zeros(size(im));
+                    boundary = handles.tip_table.boundary{r};
+                    dist(handles.tip_table.apex(r,1),handles.tip_table.apex(r,2)) = 1;
+                    dist = bwdist(dist,'Euclidean');
+                    % apply mexican hat filter
+                    mexhat = imfilter(im,pkernel, 'replicate','corr');
+                    % find the peaks in the mexicanhat image
+                    bw = imregionalmax(mexhat);
+                    % reduce the peaks to a single pixel
+                    bw = bwulterode(bw);
+                    % get the co-ordinates of the pixels
+                    [ridx,cidx] = find(bw);
+                    % get the distance of each point from the apex using
+                    % the distance transform image
+                    d = dist(sub2ind(size(im),ridx,cidx));
+                    % get the intensity value of each point
+                    v = im(sub2ind(size(im),ridx,cidx));
+%                     points = [d v ridx cidx];
+%                     points = sortrows(points,1);
+%                     % pick the point that is closest to the apex
+%                     [~,idx] = min(d);
+                    % in case there are multiple points nearby, find the
+                    % brightest point within some distance
+                    mx = max(v(d <= min(d)*2));
+                    idx = v==mx;
+                    handles.tip_table.spk(r,1:2) = [ridx(idx), cidx(idx)];
+                    if ~isempty(boundary)
+                        hold on
+%                         plot(cidx,ridx, 'b.')
+                        plot(handles.tip_table.spk(r,2),handles.tip_table.spk(r,1), 'yo')
+                        drawnow
+                    end
+                end
+            end
+        end
+    case 'threshold'
+        s = round(str2double(get(handles.txt_spk_size, 'String'))./handles.param.pixel_size(1));
+        for iH = 1:size(handles.tip_results,1)
+            for iT = 1:handles.nT
+                im = double(squeeze(handles.images.subtracted(:,:,iC,iZ,iT)));
+                im = (im-min(im(:)))/(max(im(:))-min(im(:)));
+                if get(handles.chk_spk_threshold_auto, 'Value')
+                    level = multithresh(im,2);
+                    t = level(2);
+                else
+                    t = get(handles.sld_spk_threshold, 'Value');
+                end
+                [imth,boundary] = BOPlantBlobSegmentation2D(im,t,2);
+                handles.tip_results{iH,iT}.xs1 = boundary(1);
+                handles.tip_results{iH,iT}.ys1 = boundary(2);
+                
+                if ~isempty(boundary)
+                    hold on
+                    plot(handles.tip_results{iH,iT}.xs1,handles.tip_results{iH,iT}.ys1,'g*')
+                end
+                
+            end
+        end
+end
+
+function [imth,c] = BOPlantBlobSegmentation2D(im,t,s)
+% Threshold
+imth = im>t;
+% Filter
+se = strel('disk',s);
+imthc = imopen(imth,se);
+imth = imreconstruct(imthc,imth);
+% Label
+imlabel = bwlabel(imth);
+if max(imlabel(:))>0
+    r  = regionprops(imlabel,'area','centroid');
+    c = cat(1,r.Centroid);
+    a = cat(1,r.Area);
+    [~,mi] = max(a);
+    c = c(mi,:);
+    imth = imlabel==mi;
+else
+    c = [];
+end
+
+
 
 % --------------------------------------------------------------------------
 % TIP PLOT OPTIONS
@@ -2695,10 +3239,14 @@ switch target
         delete(h);
         h = findobj(ax,'type','quiver','tag','tip_*');
         delete(h);
+                h = findobj(ax,'type','scatter','tag','tip_*');
+        delete(h);
     otherwise
         h = findobj(ax,'type','line','tag',target);
         delete(h);
         h = findobj(ax,'type','quiver','tag',target);
+        delete(h);
+                h = findobj(ax,'type','scatter','tag',target);
         delete(h);
 end
 
@@ -2706,7 +3254,7 @@ function txt_plot_tip_marker_size_Callback(hObject, eventdata, handles)
 function txt_plot_tip_vector_size_Callback(hObject, eventdata, handles)
 function txt_plot_tip_OCC_vector_size_Callback(hObject, eventdata, handles)
 
-function fnc_tip_plot(ax,handles)
+function fnc_tip_plot_old(ax,handles)
 iT = round(get(handles.sld_T, 'value'));
 OCC_vector_size = str2double(get(handles.txt_plot_tip_OCC_vector_size,'String'));
 vector_size = str2double(get(handles.txt_plot_tip_vector_size,'String'));
@@ -2918,6 +3466,263 @@ if isfield(handles,'tip_results') && ~isempty(handles.tip_results)
     drawnow;
 end
 
+
+function fnc_tip_plot(ax,handles)
+% get the frame, section and tip trace channel
+iT = round(get(handles.sld_T, 'value'));
+iZ = round(get(handles.sld_Z, 'value'));
+zoom = get(handles.sld_zoom, 'value');
+options = get(handles.pop_tip_trace_channel, 'string');
+options_idx = get(handles.pop_tip_trace_channel, 'value');
+iC = str2double(options{options_idx});
+% get the maximum number of hyphae
+nH = max(handles.tip_table.ID);
+% % set up a colormap for the each hypha
+% cmap = jet(nH);
+% get the parameter settings for the plots
+OCC_vector_size = str2double(get(handles.txt_plot_tip_OCC_vector_size,'String'));
+vector_size = str2double(get(handles.txt_plot_tip_vector_size,'String'));
+marker_size = (str2double(get(handles.txt_plot_tip_marker_size,'String')).*zoom);
+max_head_size = 0.04;
+
+handles.ax_image.Units = 'pixels';
+hold on
+% get results for active hyphae from the current frame, section and channel
+idx = find(handles.tip_table.T == iT & handles.tip_table.Z == iZ & handles.tip_table.C == iC & handles.tip_table.active == 1);
+if iT < handles.nT
+idx2 = find(handles.tip_table.T == iT+1 & handles.tip_table.Z == iZ & handles.tip_table.C == iC & handles.tip_table.active == 1);
+else
+    idx2 = [];
+end
+% get the number of hyphae
+% for iH = 1:length(idx)
+%             % get the co-ordinates for the key landmarks
+%              Ex1 = handles.tip_table.endpoint(idx,2)
+%              Ey1 = handles.tip_table.endpoint(idx,1)
+%             center = handles.tip_results{iH,iT}.center;
+%             Cx1 = center(2);
+%             Cy1 = center(1);
+%             zone = handles.tip_results{iH,iT}.zone;
+%             Zx1 = zone(2);
+%             Zy1 = zone(1);
+%             radius = handles.tip_results{iH,iT}.radius;
+%             c = handles.tip_results{iH,iT}.boundary;
+%             cm = handles.tip_results{iH,iT}.cm;
+%             cr = handles.tip_results{iH,iT}.cr;
+%             cl = handles.tip_results{iH,iT}.cl;
+%             Tx1 = c(cm,2);
+%             Ty1 = c(cm,1);
+%             if isfield(handles.tip_results{iH,iT},'xs1')
+%                 Sx1 = handles.tip_results{iH,iT}.xs1;
+%                 Sy1 = handles.tip_results{iH,iT}.ys1;
+%             else
+%                 Sx2 = [];
+%                 Sy2 = [];
+%             end
+%             if iT<handles.nT && isfield(handles.tip_results{iH,iT+1},'center')
+% %                 endpoint_2 = handles.tip_results{iH,iT+1}.endpoint;
+% %                 Ex2 = endpoint_2(2);
+% %                 Ey2 = endpoint_2(1);
+%                 center_2 = handles.tip_results{iH,iT+1}.center;
+%                 Cx2 = center_2(2);
+%                 Cy2 = center_2(1);
+% %             zone_2 = handles.tip_results{iH,iT+1}.zone;
+% %             Zx2 = zone_2(2);
+% %             Zy2 = zone_2(1);
+%                 c2 = handles.tip_results{iH,iT+1}.boundary;
+%                 cm2 = handles.tip_results{iH,iT+1}.cm;
+%                 Tx2 = c2(cm2,2);
+%                 Ty2 = c2(cm2,1);
+%
+%                 % check that the spk has been identified
+%                 if isfield(handles.tip_results{iH,iT+1},'xs1')
+%                     Sx2 = handles.tip_results{iH,iT+1}.xs1;
+%                     Sy2 = handles.tip_results{iH,iT+1}.ys1;
+%                 else
+%                     Sx2 = [];
+%                     Sy2 = [];
+%                 end
+%             else
+% %                 Ex2 = Ex1;
+% %                 Ey2 = Ey1;
+% %                 Zx2 = Zx1;
+% %                 Zy2 = Zy1;
+%                 Cx2 = Cx1;
+%                 Cy2 = Cy1;
+%                 Tx2 = Tx1;
+%                 Ty2 = Ty1;
+%                 if isfield(handles.tip_results{iH,iT},'xs1')
+%                 Sx2 = Sx1;
+%                 Sy2 = Sy1;
+%                                 else
+%                     Sx2 = [];
+%                     Sy2 = [];
+%                 end
+%             end
+%             % check that there is a Gaussian fit
+%             if isfield(handles.tip_results{iH,1},'cp')
+%                 cp = handles.tip_results{iH,iT}.cp;
+%                 ypfit = handles.tip_results{iH,iT}.ypfit;
+%                 [~,idx] = max(ypfit);
+%                 Px1 = cp(idx,2);
+%                 Py1 = cp(idx,1);
+%                 if iT<handles.nT && isfield(handles.tip_results{iH,iT+1},'cp2')
+%                     ypfit2 = handles.tip_results{iH,iT+1}.ypfit;
+%                     cp2 = handles.tip_results{iH,iT+1}.cp;
+%                     [~,idx2] = max(ypfit2);
+%                     Px2 = cp2(idx2,2);
+%                     Py2 = cp2(idx2,1);
+%                 else
+%                     Px2 = Px1;
+%                     Py2 = Py1;
+%                 end
+%             end
+%
+% plot the osculating circle
+if get(handles.chk_tip_plot_OCC, 'value')
+    for k = 1:length(idx) 
+    % calculate the osculating circle
+    theta = linspace(0,2*pi,100);
+    rho = ones(1,100)*handles.tip_table.radius(idx(k));
+    [xr,yr] = pol2cart(theta,rho);
+    xr = xr + handles.tip_table.center(idx(k),2);
+    yr = yr + handles.tip_table.center(idx(k),1);
+    h = plot(ax,xr,yr,'k-','LineWidth',1);
+    set(h, 'Tag','tip_OC')
+    h = plot(ax,xr,yr,'w:','LineWidth',.75);
+    set(h, 'Tag','tip_OC')
+    h = plot(ax,handles.tip_table.OCl(idx(k),2),handles.tip_table.OCl(idx(k),1),'b+');
+    set(h, 'Tag','tip_OC')
+    h = plot(ax,handles.tip_table.apex(idx(k),2),handles.tip_table.apex(idx(k),1),'g+');
+    set(h, 'Tag','tip_OCC_apex')
+    h = plot(ax,handles.tip_table.OCr(idx(k),2),handles.tip_table.OCr(idx(k),1),'y+');
+    set(h, 'Tag','tip_OC')
+    end
+end
+% plot the hyphal boundary
+if get(handles.chk_tip_plot_boundary, 'value')
+    for k = 1:length(idx)
+        h = plot(ax,handles.tip_table.boundary{idx(k)}(:,2), handles.tip_table.boundary{idx(k)}(:,1), 'c:', 'LineWidth', 0.75);
+        set(h, 'Tag','tip_boundary')
+    end
+end
+% plot the single landmarks:
+if get(handles.chk_tip_plot_endpoint, 'Value') && any(ismember(handles.tip_table.Properties.VariableNames,'endpoint'))
+    h = scatter(ax,handles.tip_table.endpoint(idx,2),handles.tip_table.endpoint(idx,1),marker_size,'y','filled','Marker','o','MarkerEdgeColor','none');
+    set(h, 'Tag','tip_endpoint')
+end
+if get(handles.chk_tip_plot_zone, 'Value') && any(ismember(handles.tip_table.Properties.VariableNames,'zone'))
+    h = scatter(ax,handles.tip_table.zone(idx,2),handles.tip_table.zone(idx,1),marker_size,'c','Marker','+');
+    set(h, 'Tag','tip_zone')
+end
+if get(handles.chk_tip_plot_OCC_apex, 'value') && any(ismember(handles.tip_table.Properties.VariableNames,'apex'))
+    h = scatter(ax,handles.tip_table.apex(idx,2),handles.tip_table.apex(idx,1),marker_size,'g','filled','Marker','o','MarkerEdgeColor','none');
+    set(h, 'Tag','tip_OCC_apex')
+end
+if get(handles.chk_tip_plot_OCC_center, 'value') && any(ismember(handles.tip_table.Properties.VariableNames,'center'))
+    h = scatter(ax,handles.tip_table.center(idx,2),handles.tip_table.center(idx,1),marker_size,'b','filled','Marker','o','MarkerEdgeColor','none');
+    set(h, 'Tag','tip_OCC_center')
+end
+if get(handles.chk_tip_plot_peak, 'value') && any(ismember(handles.tip_table.Properties.VariableNames,'peak_coordinates'))
+    h = scatter(ax,handles.tip_table.peak_coordinates(idx,2),handles.tip_table.peak_coordinates(idx,1),marker_size,'m','filled','Marker','o','MarkerEdgeColor','none');
+    set(h, 'Tag','tip_peak')
+end
+if get(handles.chk_tip_plot_sp, 'value') && any(ismember(handles.tip_table.Properties.VariableNames,'spk'))
+    h = scatter(ax,handles.tip_table.spk(idx,2),handles.tip_table.spk(idx,1),marker_size,'y','filled','Marker','o','MarkerEdgeColor','none');
+    set(h, 'Tag','tip_spk')
+end
+% plot the delta T vectors
+if get(handles.chk_tip_plot_apex_apex_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.apex(idx))
+    Vx1 = handles.tip_table.apex(idx,2)-handles.tip_table.apex(idx2,2);
+    Vy1 = handles.tip_table.apex(idx,1)-handles.tip_table.apex(idx2,1);
+    h = quiver(ax,handles.tip_table.apex(idx,2),handles.tip_table.apex(idx,1), ...
+        -Vx1*vector_size,-Vy1*vector_size,'g','AutoScale','off');
+    set(h, 'MaxHeadSize',max_head_size)
+    
+    set(h, 'Tag','tip_apex_apex_vector');
+    h = plot(ax,handles.tip_table.apex(idx,2),handles.tip_table.apex(idx,1), ...
+        'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','g');
+    set(h, 'Tag','tip_apex_apex_vector')
+end
+if get(handles.chk_tip_plot_OCC_OCC_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.center(idx))
+    Vx1 = handles.tip_table.center(idx,2)-handles.tip_table.center(idx2,2);
+    Vy1 = handles.tip_table.center(idx,1)-handles.tip_table.center(idx2,1);
+    h = quiver(ax,handles.tip_table.center(idx,2),handles.tip_table.center(idx,1), ...
+        -Vx1*vector_size,-Vy1*vector_size,'b','AutoScale','off');
+    set(h, 'MaxHeadSize',max_head_size)
+    
+    set(h, 'Tag','tip_OCC_OCC_vector');
+    h = plot(ax,handles.tip_table.center(idx,2),handles.tip_table.center(idx,1), ...
+        'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','b');
+    set(h, 'Tag','tip_OCC_OCC_vector')
+end
+if get(handles.chk_tip_plot_peak_peak_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.peak_coordinates(idx))
+    Vx1 = handles.tip_table.peak_coordinates(idx,2)-handles.tip_table.peak_coordinates(idx2,2);
+    Vy1 = handles.tip_table.peak_coordinates(idx,1)-handles.tip_table.peak_coordinates(idx2,1);
+    h = quiver(ax,handles.tip_table.peak_coordinates(idx,2),handles.tip_table.peak_coordinates(idx,1), ...
+        -Vx1*vector_size,-Vy1*vector_size,'b','AutoScale','off');
+    set(h, 'MaxHeadSize',max_head_size)
+    
+    set(h, 'Tag','tip_peak_peak_vector');
+    h = plot(ax,handles.tip_table.peak_coordinates(idx,2),handles.tip_table.peak_coordinates(idx,1), ...
+        'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','b');
+    set(h, 'Tag','tip_peak_peak_vector')
+end
+
+%             if get(handles.chk_tip_plot_peak_peak_vector, 'value')
+%                 Vx1 = Px1-Px2;
+%                 Vy1 = Py1-Py2;
+%                 h = quiver(ax,Px1,Py1,-Vx1,-Vy1,'m','AutoScaleFactor',vector_size,'MaxHeadSize',0.6);%,'Marker','o','MarkerSize',sz,'MarkerEdgeColor','k','MarkerFaceColor','r');
+%                 set(h, 'Tag','tip_peak_peak_vector');
+%                 h = plot(ax,Px2,Py2,'Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','m');
+%                 set(h, 'Tag','tip_peak_peak_vector')
+%             end
+%             if get(handles.chk_tip_plot_spk_spk_vector, 'value') && isfield(handles.tip_results{iH,iT}, 'xs1')
+%                 Vx1 = Sx1-Sx2;
+%                 Vy1 = Sy1-Sy2;
+%                 h = quiver(ax,Sx1,Sy1,-Vx1,-Vy1,'y','AutoScaleFactor',vector_size,'MaxHeadSize',0.6);%,'Marker','o','MarkerSize',sz,'MarkerEdgeColor','k','MarkerFaceColor','g');
+%                 set(h, 'Tag','tip_spk_spk_vector');
+%                 h = plot(ax,Sx2,Sy2,'Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','y');
+%                 set(h, 'Tag','tip_spk_spk_vector')
+%             end
+if get(handles.chk_tip_plot_OCC_apex_vector, 'value')
+    Vx1 = handles.tip_table.center(idx,2)-handles.tip_table.apex(idx,2);
+    Vy1 = handles.tip_table.center(idx,1)-handles.tip_table.apex(idx,1);
+    h = quiver(ax,handles.tip_table.center(idx,2),handles.tip_table.center(idx,1), ...
+        -Vx1*OCC_vector_size,-Vy1*OCC_vector_size,'g','AutoScale','off');
+        set(h, 'MaxHeadSize',max_head_size)
+
+    set(h, 'Tag','tip_OCC_apex_vector');
+    h = plot(ax,handles.tip_table.apex(idx,2),handles.tip_table.apex(idx,1), ...
+        'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','g');
+    set(h, 'Tag','tip_OCC_apex_vector')
+end
+if get(handles.chk_tip_plot_OCC_peak_vector, 'value')
+    Vx1 = handles.tip_table.center(idx,2)-handles.tip_table.peak_coordinates(idx,2);
+    Vy1 = handles.tip_table.center(idx,1)-handles.tip_table.peak_coordinates(idx,1);
+    h = quiver(ax,handles.tip_table.center(idx,2),handles.tip_table.center(idx,1), ...
+        -Vx1*OCC_vector_size,-Vy1*OCC_vector_size,'m','AutoScale','off');
+     set(h, 'MaxHeadSize',max_head_size)
+    set(h, 'Tag','tip_OCC_peak_vector');
+    h = plot(ax,handles.tip_table.peak_coordinates(idx,2),handles.tip_table.peak_coordinates(idx,1), ...
+        'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','m');
+    set(h, 'Tag','tip_OCC_peak_vector')
+end
+
+if get(handles.chk_tip_plot_OCC_spk_vector, 'value')
+    Vx1 = handles.tip_table.center(idx,2)-handles.tip_table.spk(idx,2);
+    Vy1 = handles.tip_table.center(idx,1)-handles.tip_table.spk(idx,1);
+    h = quiver(ax,handles.tip_table.center(idx,2),handles.tip_table.center(idx,1), ...
+        -Vx1*OCC_vector_size,-Vy1*OCC_vector_size,'y','AutoScale','off');
+       set(h, 'MaxHeadSize',max_head_size)
+    set(h, 'Tag','tip_OCC_spk_vector');
+    h = plot(ax,handles.tip_table.spk(idx,2),handles.tip_table.spk(idx,1),'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','y');
+    set(h, 'Tag','tip_OCC_spk_vector')
+end
+%         end
+%     end
+drawnow;
+% end
 % --------------------------------------------------------------------------
 % PROFILE PLOT OPTIONS
 % --------------------------------------------------------------------------
@@ -3117,154 +3922,15 @@ if isfield(handles,'tip_results') && ~isempty(handles.tip_results)
 end
 
 function btn_test_Callback(hObject, eventdata, handles)
-size(handles.images.midline)
+handles = fnc_tip_coordinate_system(handles);
 
-handles.thumbnails.midline = fnc_thumbnail_make(imdilate(handles.images.midline(:,:,1,1,round(handles.nT/2)),ones(7)), 'midline',handles);
-figure
-imshow(handles.thumbnails.midline,[])
+%  assignin('base','T',handles.tip_table)
+%size(handles.images.midline)
+% 
+% handles.thumbnails.midline = fnc_thumbnail_make(imdilate(handles.images.midline(:,:,1,1,round(handles.nT/2)),ones(7)), 'midline',handles);
+% figure
+% imshow(handles.thumbnails.midline,[])
 guidata(gcbo, handles);
-
-% -------------------------------------------------------------------------
-% SPITZENKORPER DETECTOR
-% -------------------------------------------------------------------------
-function sld_spk_threshold_Callback(hObject, eventdata, handles)
-function txt_spk_threshold_Callback(hObject, eventdata, handles)
-function chk_spk_threshold_auto_Callback(hObject, eventdata, handles)
-function txt_spk_size_Callback(hObject, eventdata, handles)
-function pop_spk_method_Callback(hObject, eventdata, handles)
-
-function btn_spk_threshold_Callback(hObject, eventdata, handles)
-options = get(handles.pop_tip_spk_channel, 'string');
-options_idx = get(handles.pop_tip_spk_channel, 'value');
-iC = str2double(options{options_idx});
-iT = get(handles.sld_T, 'Value');
-iZ = get(handles.sld_Z, 'Value');
-im = double(squeeze(handles.images.subtracted(:,:,iC,iZ,iT)));
-im = (im-min(im(:)))/(max(im(:))-min(im(:)));
-level = multithresh(im,2);
-set(handles.sld_spk_threshold, 'Value',level(2))
-set(handles.txt_spk_threshold, 'String',level(2))
-
-function btn_tip_spk_Callback(hObject, eventdata, handles)
-handles = fnc_tip_spk_detect(handles);
-guidata(gcbo, handles);
-
-function handles = fnc_tip_spk_detect(handles)
-options = get(handles.pop_tip_spk_channel, 'string');
-options_idx = get(handles.pop_tip_spk_channel, 'value');
-iC = str2double(options{options_idx});
-iZ = get(handles.sld_Z, 'Value');
-nH = max(handles.images.tip(:));
-options = get(handles.pop_spk_method, 'string');
-options_idx = get(handles.pop_spk_method, 'value');
-method = options{options_idx};
-assignin('base','tip_results',handles.tip_results);
-axes(handles.ax_image)
-
-switch method
-    case 'template'
-        % set up mexican hat filter
-        scale = round(str2double(get(handles.txt_spk_size, 'String'))./handles.param.pixel_size(1));
-        ksize = scale.*3 ;%kernel needs to be 3 times bigger than the object to get the full mexican hat filter
-        pkernel = del2(-fspecial('gaussian',[ksize ksize],ksize./6.67));%sets up a mexican hat filter
-        for iH = 1:nH
-            
-            for iT = 1:handles.nT
-                im = double(squeeze(handles.images.subtracted(:,:,iC,iZ,iT)));
-                im = (im-min(im(:)))/(max(im(:))-min(im(:)));
-                if handles.TipIdx(iH) && size(handles.tip_results,2) >=iT && ~isempty(handles.tip_results{iH,iT}) && isfield(handles.tip_results{iH,iT}, 'cm')
-                    
-                    %     % only use the region within the osculating circle
-                    %     center = handles.tip_results{iH,iT}.center;
-                    %     radius = handles.tip_results{iH,iT}.radius;
-                    %     % calculate the osculating circle
-                    %     theta = linspace(0,2*pi,60);
-                    %     rho = ones(1,60)*radius;
-                    %     [xr,yr] = pol2cart(theta,rho);
-                    %     xr = xr + center(2);
-                    %     yr = yr + center(1);
-                    %     mask = poly2mask(xr,yr,size(im,1),size(im,2));
-                    %
-                    % only use the region in the selected tip
-                    % find centers within the tip
-                    tip = handles.images.tip(:,:,1,1,iT)==iH;
-                    im(~tip) = 0;%immultiply(im,tip);
-                    % calculate the distance transform from the tip
-                    dist = zeros(size(im));
-                    boundary = handles.tip_results{iH,iT}.boundary;
-                    cm = handles.tip_results{iH,iT}.cm;
-                    dist(boundary(cm,1),boundary(cm,2)) = 1;
-                    % dist = bwdist(dist);
-                    dist = bwdist(dist,'Euclidean');
-                    % apply mexican hat filter
-                    mexhat = imfilter(im,pkernel, 'replicate','corr');
-                    %mexhat = im;
-                    % display the image
-                    %                 axes(handles.axes_profile_image)
-                    %                 hold off
-                    %                 cla
-                    %                 imshow(mexhat, [])
-                    bw = imregionalmax(mexhat);
-                    bw = bwulterode(bw);
-                    [ridx,cidx] = find(bw);
-                    v = dist(sub2ind(size(im),ridx,cidx));
-                    [~,idx] = min(v);
-                    handles.tip_results{iH,iT}.ys1 = ridx(idx);
-                    handles.tip_results{iH,iT}.xs1 = cidx(idx);
-                    %P  = houghpeaks(round(255.*enhanced(:,:,iT)),2);
-                    if ~isempty(boundary)
-                        hold on
-                        plot(cidx,ridx, 'b.')
-                        plot(handles.tip_results{iH,iT}.xs1,handles.tip_results{iH,iT}.ys1, 'go')
-                        drawnow
-                    end
-                end
-            end
-        end
-    case 'threshold'
-        s = round(str2double(get(handles.txt_spk_size, 'String'))./handles.param.pixel_size(1));
-        for iH = 1:size(handles.tip_results,1)
-            for iT = 1:handles.nT
-                im = double(squeeze(handles.images.subtracted(:,:,iC,iZ,iT)));
-                im = (im-min(im(:)))/(max(im(:))-min(im(:)));
-                if get(handles.chk_spk_threshold_auto, 'Value')
-                    level = multithresh(im,2);
-                    t = level(2);
-                else
-                    t = get(handles.sld_spk_threshold, 'Value');
-                end
-                [imth,boundary] = BOPlantBlobSegmentation2D(im,t,2);
-                handles.tip_results{iH,iT}.xs1 = boundary(1);
-                handles.tip_results{iH,iT}.ys1 = boundary(2);
-                
-                if ~isempty(boundary)
-                    hold on
-                    plot(handles.tip_results{iH,iT}.xs1,handles.tip_results{iH,iT}.ys1,'g*')
-                end
-                
-            end
-        end
-end
-
-function [imth,c] = BOPlantBlobSegmentation2D(im,t,s)
-% Threshold
-imth = im>t;
-% Filter
-se = strel('disk',s);
-imthc = imopen(imth,se);
-imth = imreconstruct(imthc,imth);
-% Label
-imlabel = bwlabel(imth);
-if max(imlabel(:))>0
-    r  = regionprops(imlabel,'area','centroid');
-    c = cat(1,r.Centroid);
-    a = cat(1,r.Area);
-    [~,mi] = max(a);
-    c = c(mi,:);
-    imth = imlabel==mi;
-else
-    c = [];
-end
 
 % -------------------------------------------------------------------------
 % TIP DATA OUTPUT
@@ -3456,19 +4122,18 @@ switch target
             im_out = zeros(sz(1),sz(2),1,'like',handles.images.(target));
             im_out(:,:,1) = single(squeeze(handles.images.(target)(:,:,iC,iZ,iT).*rgb_channels(iC)));
         end
-    case 'selected'
-        nhyphae = max(handles.images.selected(:));
-        cmap = jet(256);
+            case 'selected'
+        mx = max(handles.images.(target)(:));
         cmap(1,:) = 0;
-        % a label matrix, so normalise to the maximum
-        im_out(:,:,:,1) = ind2rgb(uint8(255.*handles.images.selected./nhyphae),cmap);
-    case 'tip'
-                nhyphae = max(handles.images.tip(:));
-        cmap = jet(256);
+        % normalise to the maximum and convert to RGB
+        im_out(:,:,:,1) = ind2rgb(uint8(255.*handles.images.(target)./mx),cmap);
+    case {'tip';'boundary';'boundary_D';'boundary_FM';'axial';'radial'}
+        temp = handles.images.(target)(:,:,iC,iZ,iT);
+        idx = ~isinf(temp(:));
+        mx = max(temp(idx));
         cmap(1,:) = 0;
-        % a label matrix, so normalise to the maximum
-        im_out(:,:,:,1) = ind2rgb(uint8(255.*handles.images.tip(:,:,iC,iZ,iT)./nhyphae),cmap);
-
+        % normalise to the maximum and convert to RGB
+        im_out(:,:,:,1) = ind2rgb(uint8(255.*handles.images.(target)(:,:,iC,iZ,iT)./mx),cmap);
     case 'white'
         im_out = ones(size(handles.images.filtered,1),size(handles.images.filtered,2),'like',handles.images.filtered);
     case 'black'
@@ -3522,8 +4187,18 @@ switch merge
             merge_out(:,:,1) = single(squeeze(handles.images.(merge)(:,:,min(tC,mC),min(tZ,iZ),min(tT,iT)).*rgb_channels(mC)));
         end
     case 'selected'
-        % a label matrix, so normalise to the maximum
-        merge_out(:,:,:,1) = handles.images.selected./max(handles.images.selected(:));
+        mx = max(handles.images.(merge)(:));
+        cmap(1,:) = 0;
+        % normalise to the maximum and convert to RGB
+        merge_out(:,:,:,1) = ind2rgb(uint8(255.*handles.images.(merge)./mx),cmap);
+    case {'tip';'boundary';'boundary_D';'boundary_FM';'axial';'radial'}
+        temp = handles.images.(merge)(:,:,iC,iZ,iT);
+        idx = ~isinf(temp(:));
+        mx = max(temp(idx));
+        cmap = jet(256);
+        cmap(1,:) = 0;
+        % normalise to the maximum and convert to RGB
+        merge_out(:,:,:,1) = ind2rgb(uint8(255.*handles.images.(merge)(:,:,iC,iZ,iT)./mx),cmap);
     case 'white'
         merge_out = ones(size(handles.images.filtered,1),size(handles.images.filtered,2),'like',handles.images.filtered);
     case 'black'
@@ -3826,11 +4501,11 @@ if handles.save_full_size_flag == 1
 else
     ax = handles.ax_image;
 end
-if isfield(handles,'tip_results') && ~isempty(handles.tip_results)
+if isfield(handles,'tip_table') && ~isempty(handles.tip_table)
     fnc_tip_plot(ax,handles)
-         fnc_tip_plot_profile(ax,handles)
-         fnc_tip_profile_image(handles);
-         fnc_tip_plot_graph(handles);
+    fnc_tip_plot_profile(ax,handles)
+%          fnc_tip_profile_image(handles);
+%          fnc_tip_plot_graph(handles);
 end
 %fnc_tip_table(handles);
 %guidata(gcbo,handles)
@@ -3850,11 +4525,13 @@ mag = api1.findFitMag();
 api1.setMagnification(mag);
 set(handles.sld_zoom, 'value', mag)
 set(handles.txt_zoom, 'string',  num2str(mag, '%4.2f'))
+fnc_adjust_scatter_size(handles)
 
 function btn_Im_100_Callback(hObject, eventdata, handles)
 % set the image magnifcation to 100%
 api1 = iptgetapi(handles.hSp1);
 api1.setMagnification(1);
+fnc_adjust_scatter_size(handles)
 set(handles.sld_zoom, 'value', 1)
 set(handles.txt_zoom, 'string', num2str(1, '%4.2f'))
 
@@ -3869,6 +4546,17 @@ fnc_zoom(handles,NewVal)
 function fnc_zoom(handles,val)
 api = iptgetapi(handles.hSp1);
 api.setMagnification(val);
+fnc_adjust_scatter_size(handles)
+
+function fnc_adjust_scatter_size(handles)
+zoom = get(handles.sld_zoom,'Value');
+h = findobj(handles.ax_image,'Type','scatter');
+sz = (str2double(get(handles.txt_plot_tip_marker_size,'String')).*zoom).^2;
+if ~isempty(h)
+    for iS = 1:length(h)
+    h(iS).SizeData = sz;
+    end
+end
 
 function sld_black_level_Callback(hObject, eventdata, handles)
 low = round(get(hObject, 'Value'));
@@ -4697,6 +5385,8 @@ function txt_tip_trace_distance_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
 
 % tip profile controls
+function pop_tip_profile_method_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
 function txt_tip_profile_erode_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
 function txt_tip_profile_sigma_CreateFcn(hObject, eventdata, handles)
@@ -4721,3 +5411,6 @@ function txt_plot_tip_OCC_vector_size_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
 function txt_plot_tip_marker_size_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
+
+
+
