@@ -22,7 +22,7 @@ function varargout = TipTrackerv3(varargin)
 
 % Edit the above text to modify the response to help TipTrackerv3
 
-% Last Modified by GUIDE v2.5 04-Aug-2018 15:17:46
+% Last Modified by GUIDE v2.5 09-Aug-2018 09:02:17
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -91,16 +91,16 @@ handles.filter_controls = get(handles.uip_filter, 'Children');
 handles.back_sub_controls =  ...
     [handles.txt_ch1_back, handles.txt_ch2_back, handles.txt_ch3_back, handles.txt_ch4_back; ...
     handles.chk_ch1_back, handles.chk_ch2_back, handles.chk_ch3_back, handles.chk_ch4_back; ...
-    handles.txt_ch1_std, handles.txt_ch2_std, handles.txt_ch3_std, handles.txt_ch4_std;  ...
-    handles.txt_ch1_offset, handles.txt_ch2_offset, handles.txt_ch3_offset, handles.txt_ch4_offset; ...
-    handles.chk_ch1_offset, handles.chk_ch2_offset, handles.chk_ch3_offset, handles.chk_ch4_offset];
+    handles.txt_ch1_std, handles.txt_ch2_std, handles.txt_ch3_std, handles.txt_ch4_std];  
+% ...
+%     handles.txt_ch1_offset, handles.txt_ch2_offset, handles.txt_ch3_offset, handles.txt_ch4_offset; ...
+%     handles.chk_ch1_offset, handles.chk_ch2_offset, handles.chk_ch3_offset, handles.chk_ch4_offset];
 
 handles.back_controls = ...
     [handles.pop_back_method, handles.chk_auto_corr, handles.pop_auto_corr, handles.txt_auto_corr];
 
 handles.autoflr_controls = ...
-    [handles.pop_ch5, handles.txt_ch5_back,  handles.chk_ch5_back, handles.txt_ch5_offset, ...
-    handles.chk_ch5_offset, handles.txt_ch5_std];
+    [handles.pop_ch5, handles.txt_ch5_back,  handles.chk_ch5_back, handles.txt_ch5_std];
 
 handles.tip_trace_controls = get(handles.uip_tip_trace, 'Children');
 handles.tip_profile_controls = get(handles.uip_tip_profile, 'Children');
@@ -172,7 +172,7 @@ guidata(hObject, handles);
 guidata(hObject, handles);
 
 % UIWAIT makes TipTrackerv3 wait for user response (see UIRESUME)
-% uiwait(handles.figure1);
+% uiwait(handles.Tip_Tracker);
 
 
 % --- Outputs from this function are returned to the command line.
@@ -772,7 +772,7 @@ set(handles.pop_segment_method,'String',handles.options.segment_method)
 set(handles.pop_tip_trace_channel,'String', {0:5}, 'Value',1)
 set(handles.pop_tip_spk_channel,'String', {0:5}, 'Value',1)
 
-handles.options.tip_profile_method = {'nearest';'erode';'mormals'};
+handles.options.tip_profile_method = {'nearest';'erode';'normals'};
 set(handles.pop_tip_profile_method,'String',handles.options.tip_profile_method)
 
 handles.options.spk_method = {'threshold';'template'};
@@ -1055,8 +1055,8 @@ handles.param.subsample = 0;
 handles.param.back_method = 'single';
 handles.param.back_field_radius = 11;
 handles.param.chk_back(1:5) = 1;
-handles.param.chk_offset(1:5) = 0;
-handles.param.offset(1:5) = 0;
+% handles.param.chk_offset(1:5) = 0;
+% handles.param.offset(1:5) = 0;
 % autofluorescence correction
 handles.param.chk_auto_corr = 0;
 handles.param.auto_corr = 0.56;
@@ -1193,6 +1193,187 @@ fnc_display_image(handles);
 % function chk_ch5_invert_Callback(hObject, eventdata, handles)
 % handles.param.invert(5) = get(hObject, 'Value');
 % guidata(hObject, handles);
+
+% -------------------------------------------------------------------------
+% LINE PROFILE
+% -------------------------------------------------------------------------
+function txt_profile_FWHM_R_Callback(hObject, eventdata, handles)
+function txt_profile_FWHM_G_Callback(hObject, eventdata, handles)
+function txt_profile_FWHM_B_Callback(hObject, eventdata, handles)
+function txt_profile_FWHM_peak_R_Callback(hObject, eventdata, handles)
+function txt_profile_FWHM_peak_G_Callback(hObject, eventdata, handles)
+function txt_profile_FWHM_peak_B_Callback(hObject, eventdata, handles)
+
+% function chk_profile_invert_Callback(hObject, eventdata, handles)
+% handles.expt.profile_invert = get(hObject,'Value');
+% guidata(hObject, handles);
+% fnc_param_save(handles)
+
+function pop_profile_units_Callback(hObject, eventdata, handles)
+options = get(handles.pop_profile_units, 'string');
+options_idx = get(handles.pop_profile_units, 'value');
+units = options{options_idx};
+channels = ['R';'G';'B'];
+for iC = 1:length(handles.expt.FWHM)
+    switch units
+        case 'pixels'
+            set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(handles.expt.FWHM(iC), '%4.2f'))
+        case 'nm'
+            set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(round(1000.*handles.expt.FWHM(iC).*handles.param.resample.*handles.expt.micron_per_pixel,3,'significant')))
+        case 'microns'
+            set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(round(handles.expt.FWHM(iC).*handles.param.resample.*handles.expt.micron_per_pixel,3,'significant')))
+        case 'mm'
+            set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(round(handles.expt.FWHM(iC).*handles.param.resample.*handles.expt.micron_per_pixel./1000,3,'significant')))
+    end
+end
+
+function txt_time_Callback(hObject, eventdata, handles)
+handles.expt.time = str2double(get(hObject,'String'));
+guidata(hObject, handles);
+fnc_param_save(handles)
+
+function txt_micron_per_pix_Callback(hObject, eventdata, handles)
+handles.expt.micron_per_pixel = str2double(get(hObject,'String'));
+guidata(hObject, handles);
+fnc_param_save(handles)
+
+function btn_profile_calibration_Callback(hObject, eventdata, handles)
+set(handles.pop_profile_units,'Enable','on')
+handles = fnc_calibration(handles);
+guidata(gcbo, handles);
+
+function handles = fnc_calibration(handles)
+% prompts for two input points and the distance in mm between them
+set(handles.stt_status, 'string','Please select a calibration distance');
+hl = imline(handles.ax_image);
+pos = wait(hl);
+resume(hl)
+dist = inputdlg('calibration length (mm)');
+delete(hl);
+handles.expt.micron_per_pixel = 1000.*str2double(dist{1})/sqrt((pos(1,1)-pos(2,1))^2 + (pos(1,2)-pos(2,2))^2);
+set(handles.stt_status, 'string',['The calibration is ' num2str(handles.expt.micron_per_pixel, '%4.2f') ' µm per pixel']);
+set(handles.txt_micron_per_pix, 'string', num2str(handles.expt.micron_per_pixel, '%4.2f'));
+
+function txt_profile_FWHM_min_Callback(hObject, eventdata, handles)
+handles = fnc_process_set_scale(handles);
+guidata(hObject, handles);
+fnc_param_save(handles)
+
+% function txt_profile_FWHM_max_Callback(hObject, eventdata, handles)
+% handles = fnc_process_set_scale(handles);
+% guidata(hObject, handles);
+% fnc_param_save(handles)
+
+function btn_profile_FWHM_set_min_Callback(hObject, eventdata, handles)
+handles = fnc_profile(handles);
+% channels = logical(handles.expt.template_channels);
+% if sum(handles.expt.template_channels) == 1
+%     handles.expt.FWHM_min = handles.expt.FWHM(channels);
+% else
+%     handles.expt.FWHM_min = min(handles.expt.FWHM(channels));
+% end
+handles.expt.FWHM_min = min(handles.expt.FWHM);
+set(handles.txt_profile_FWHM_min, 'String',handles.expt.FWHM_min)
+handles = fnc_process_set_scale(handles);
+guidata(hObject, handles);
+fnc_param_save(handles)
+% 
+% function btn_profile_FWHM_set_max_Callback(hObject, eventdata, handles)
+% handles = fnc_profile(handles);
+% channels = logical(handles.expt.template_channels);
+% if sum(handles.expt.template_channels) == 1
+%     handles.expt.FWHM_max = handles.expt.FWHM(channels);
+% else
+%     handles.expt.FWHM_max = max(handles.expt.FWHM(channels));
+% end
+% set(handles.txt_profile_FWHM_max, 'String',handles.expt.FWHM_max)
+% handles = fnc_process_set_scale(handles);
+% guidata(hObject, handles);
+% fnc_param_save(handles)
+
+function btn_profile_Callback(hObject, eventdata, handles)
+handles = fnc_profile(handles);
+guidata(hObject, handles);
+
+function handles = fnc_profile(handles)
+options = get(handles.pop_profile_units, 'string');
+options_idx = get(handles.pop_profile_units, 'value');
+units = options{options_idx};
+scaling = get(handles.sld_white_level, 'Value');
+% ---
+set(handles.stt_status,'String','Please draw a profile over a feature of interest');
+fnc_clear_overlays(handles)
+% clear the text boxes
+channels = ['R','G','B'];
+for iC = 1:3
+    set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(0, '%4.2f'));
+    set(eval(['handles.txt_profile_FWHM_peak_' channels(iC) ]), 'string', num2str(0, '%4.2f'));
+end
+% get the profile
+axes(handles.ax_image)
+[~, ~, lv] = improfile;
+% compress the values to a n x 1-3 array
+lv = squeeze(lv).*scaling;
+% if get(handles.chk_profile_invert,'Value')
+%     lv = handles.param.normalise-lv;
+% end
+nC = size(lv,2);
+% find the approximate size from the approximate 50% threshold
+slv = double(sort(lv,1,'ascend'));% sort the intensity values
+% use the top and bottom values and take the 50% threshold
+low = slv(1,:);
+high = slv(end,:);
+th = (high-low)./2 + low;
+% construct an interpolated curve
+x = double(1:length(slv))';
+xi = double(1:0.1:length(slv))';
+y = interp1(x,lv,xi,'pchip');
+% now plot the result
+axes(handles.axes_profile_plot)
+gcolors = ['m','g','b'];
+cla
+hold off
+handles.expt.FWHM = zeros(1,nC);
+for iC = 1:nC
+    plot(x,lv(:,iC), 'color',gcolors(iC),'marker','.')
+    % find when the curve passes the 50% threshold
+    hold on
+    idx1 = find(y(:,iC)>th(iC),1,'first');
+    idx2 = find(y(:,iC)>th(iC),1,'last');
+    if idx1 ~= idx2
+        line([xi(idx1) xi(idx1)],ylim, 'linestyle',':','color',gcolors(iC))
+        line([xi(idx2) xi(idx2)],ylim, 'linestyle',':','color',gcolors(iC))
+        handles.expt.FWHM(iC) = xi(idx2)-xi(idx1);
+    else
+        handles.expt.FWHM(iC) = 0;
+    end
+    switch units
+        case 'pixels'
+            set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(handles.expt.FWHM(iC), '%4.2f'))
+        case 'nm'
+            set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(round(1000.*handles.expt.FWHM(iC).*handles.param.resample.*handles.expt.micron_per_pixel,3,'significant')))
+        case 'microns'
+            set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(round(handles.expt.FWHM(iC).*handles.param.resample.*handles.expt.micron_per_pixel,3,'significant')))
+        case 'mm'
+            set(eval(['handles.txt_profile_FWHM_' channels(iC)]), 'string', num2str(round(handles.expt.FWHM(iC).*handles.param.resample.*handles.expt.micron_per_pixel./1000,3,'significant')))
+    end
+    set(eval(['handles.txt_profile_FWHM_peak_' channels(iC)]), 'string', num2str(round(slv(end,iC),3,'significant')))
+end
+set(handles.stt_status,'String','Displaying profile plot');drawnow;
+
+%-------------------------------------------------------------------------
+% SET SCALE BASED ON FWHM
+%-------------------------------------------------------------------------
+
+% function txt_process_target_width_Callback(hObject, eventdata, handles)
+% 
+% handles = fnc_process_set_scale(handles);
+% guidata(hObject, handles);
+% fnc_param_save(handles)
+
+function handles = fnc_process_set_scale(handles)
+handles.expt.FWHM_min = str2double(get(handles.txt_profile_FWHM_min, 'String'));
+% update the scale-dependent parameters
 
 % --------------------------------------------------------------------------
 % XY AVERAGE
@@ -1551,27 +1732,27 @@ set(handles.controls(4:5), 'enable','on');
 
 function txt_ch1_back_Callback(hObject, eventdata, handles)
 handles.param.back(1) = str2double(get(handles.txt_ch1_back, 'string'));
-handles.param.back_n_std(1) = fnc_sd(1, handles);
+% handles.param.back_n_std(1) = fnc_sd(1, handles);
 guidata(gcbo, handles);
 
 function txt_ch2_back_Callback(hObject, eventdata, handles)
 handles.param.back(2) = str2double(get(handles.txt_ch2_back, 'string'));
-handles.param.back_n_std(2) = fnc_sd(2, handles);
+% handles.param.back_n_std(2) = fnc_sd(2, handles);
 guidata(gcbo, handles);
 
 function txt_ch3_back_Callback(hObject, eventdata, handles)
 handles.param.back(3) = str2double(get(handles.txt_ch3_back, 'string'));
-handles.param.back_n_std(3) = fnc_sd(3, handles);
+% handles.param.back_n_std(3) = fnc_sd(3, handles);
 guidata(gcbo, handles);
 
 function txt_ch4_back_Callback(hObject, eventdata, handles)
 handles.param.back(4) = str2double(get(handles.txt_ch4_back, 'string'));
-handles.param.back_n_std(4) = fnc_sd(4, handles);
+% handles.param.back_n_std(4) = fnc_sd(4, handles);
 guidata(gcbo, handles);
 
 function txt_ch5_back_Callback(hObject, eventdata, handles)
 handles.param.back(5) = str2double(get(handles.txt_ch5_back, 'string'));
-handles.param.back_n_std(5) = fnc_sd(5, handles);
+% handles.param.back_n_std(5) = fnc_sd(5, handles);
 guidata(gcbo, handles);
 
 
@@ -1601,25 +1782,25 @@ handles.param.back_n_std(5) = fnc_sd(5, handles);
 guidata(gcbo, handles);
 
 
-function txt_ch1_offset_Callback(hObject, eventdata, handles)
-handles.param.offset(1) = str2double(get(handles.txt_ch1_offset, 'string'));
-guidata(gcbo, handles);
-
-function txt_ch2_offset_Callback(hObject, eventdata, handles)
-handles.param.offset(2) = str2double(get(handles.txt_ch2_offset, 'string'));
-guidata(gcbo, handles);
-
-function txt_ch3_offset_Callback(hObject, eventdata, handles)
-handles.param.offset(3) = str2double(get(handles.txt_ch3_offset, 'string'));
-guidata(gcbo, handles);
-
-function txt_ch4_offset_Callback(hObject, eventdata, handles)
-handles.param.offset(4) = str2double(get(handles.txt_ch4_offset, 'string'));
-guidata(gcbo, handles);
-
-function txt_ch5_offset_Callback(hObject, eventdata, handles)
-handles.param.offset(5) = str2double(get(handles.txt_ch5_offset, 'string'));
-guidata(gcbo, handles);
+% function txt_ch1_offset_Callback(hObject, eventdata, handles)
+% handles.param.offset(1) = str2double(get(handles.txt_ch1_offset, 'string'));
+% guidata(gcbo, handles);
+% 
+% function txt_ch2_offset_Callback(hObject, eventdata, handles)
+% handles.param.offset(2) = str2double(get(handles.txt_ch2_offset, 'string'));
+% guidata(gcbo, handles);
+% 
+% function txt_ch3_offset_Callback(hObject, eventdata, handles)
+% handles.param.offset(3) = str2double(get(handles.txt_ch3_offset, 'string'));
+% guidata(gcbo, handles);
+% 
+% function txt_ch4_offset_Callback(hObject, eventdata, handles)
+% handles.param.offset(4) = str2double(get(handles.txt_ch4_offset, 'string'));
+% guidata(gcbo, handles);
+% 
+% function txt_ch5_offset_Callback(hObject, eventdata, handles)
+% handles.param.offset(5) = str2double(get(handles.txt_ch5_offset, 'string'));
+% guidata(gcbo, handles);
 
 
 function pop_ch1_std_thresh_Callback(hObject, eventdata, handles)
@@ -1645,21 +1826,21 @@ function fnc_update_back_chk(iC, flag, handles)
 if flag == 1
     handles.param.chk_back(iC) = 1;
     handles.param.back(iC) = str2double(get(eval(['handles.txt_ch' num2str(iC) '_back']), 'string'));
-    handles.param.chk_offset(iC) = 0;
-    set(eval(['handles.chk_ch' num2str(iC) '_offset']), 'value',0)
+%     handles.param.chk_offset(iC) = 0;
+%     set(eval(['handles.chk_ch' num2str(iC) '_offset']), 'value',0)
 end
 guidata(gcbo, handles);
 
-function fnc_update_offset_chk(iC, flag, handles)
-% iC    Channel
-% flag  1 if checked
-if flag == 1
-    handles.param.chk_back(iC) = 0;
-    set(eval(['handles.chk_ch' num2str(iC) '_back']), 'value',0)
-    handles.param.chk_offset(iC) = 1;
-    handles.param.offset(iC) = str2double(get(eval(['handles.txt_ch' num2str(iC) '_offset']), 'string'));
-end
-guidata(gcbo, handles);
+% function fnc_update_offset_chk(iC, flag, handles)
+% % iC    Channel
+% % flag  1 if checked
+% if flag == 1
+%     handles.param.chk_back(iC) = 0;
+%     set(eval(['handles.chk_ch' num2str(iC) '_back']), 'value',0)
+%     handles.param.chk_offset(iC) = 1;
+%     handles.param.offset(iC) = str2double(get(eval(['handles.txt_ch' num2str(iC) '_offset']), 'string'));
+% end
+% guidata(gcbo, handles);
 
 
 function chk_ch1_back_Callback(hObject, eventdata, handles)
@@ -1677,20 +1858,20 @@ fnc_update_back_chk(4, get(hObject, 'value'), handles)
 function chk_ch5_back_Callback(hObject, eventdata, handles)
 fnc_update_back_chk(5, get(hObject, 'value'), handles)
 
-function chk_ch1_offset_Callback(hObject, eventdata, handles)
-fnc_update_offset_chk(1, get(hObject, 'value'), handles)
-
-function chk_ch2_offset_Callback(hObject, eventdata, handles)
-fnc_update_offset_chk(2, get(hObject, 'value'), handles)
-
-function chk_ch3_offset_Callback(hObject, eventdata, handles)
-fnc_update_offset_chk(3, get(hObject, 'value'), handles)
-
-function chk_ch4_offset_Callback(hObject, eventdata, handles)
-fnc_update_offset_chk(4, get(hObject, 'value'), handles)
-
-function chk_ch5_offset_Callback(hObject, eventdata, handles)
-fnc_update_offset_chk(5, get(hObject, 'value'), handles)
+% function chk_ch1_offset_Callback(hObject, eventdata, handles)
+% fnc_update_offset_chk(1, get(hObject, 'value'), handles)
+% 
+% function chk_ch2_offset_Callback(hObject, eventdata, handles)
+% fnc_update_offset_chk(2, get(hObject, 'value'), handles)
+% 
+% function chk_ch3_offset_Callback(hObject, eventdata, handles)
+% fnc_update_offset_chk(3, get(hObject, 'value'), handles)
+% 
+% function chk_ch4_offset_Callback(hObject, eventdata, handles)
+% fnc_update_offset_chk(4, get(hObject, 'value'), handles)
+% 
+% function chk_ch5_offset_Callback(hObject, eventdata, handles)
+% fnc_update_offset_chk(5, get(hObject, 'value'), handles)
 
 function txt_back_field_radius_Callback(hObject, eventdata, handles)
 handles.param.back_field_radius = str2double(get(handles.txt_back_field_radius, 'string'));
@@ -1703,13 +1884,20 @@ handles.param.back_method = str2double(options{pop_index});
 guidata(gcbo, handles);
 
 function btn_back_sub_Callback(hObject, eventdata, handles)
-% --- clear all the axes
-%fnc_erase_plots(handles);
-% reset all the downstream arrays
-% handles.processed = [];
-% handles.RGB = [];
-% handles.RGBmerge = [];
-% handles.HSV = [];
+    handles = fnc_background_subtract(handles);
+    guidata(hObject, handles);
+% update the thumbnails
+handles.thumbnails.subtracted = fnc_thumbnail_make(handles.images.subtracted(:,:,:,1,round(handles.nT/2)), 'subtracted',handles);
+handles = fnc_thumbnail_display('subtracted',handles);
+set(handles.pop_display_image, 'Value', find(strcmpi(get(handles.pop_display_image, 'String'), 'subtracted')));
+handles = fnc_display_image(handles);
+    set(handles.segment_controls, 'enable','on')
+    handles = fnc_segment_method(handles);
+    % clear the axes
+    h = findobj(gcf, 'Type','line','color','k','linestyle',':');
+    delete(h)
+
+    function handles = fnc_background_subtract(handles)
 % pre-allocate the background subtracted array
 handles.images.subtracted = repmat(single(0),[handles.newnY handles.newnX handles.nC handles.newnZ handles.newnT]);
 % get the parameters
@@ -1722,34 +1910,31 @@ pop_index = get(handles.pop_auto_corr, 'Value');
 handles.auto_ch = str2double(options{pop_index});
 handles.frame_back = [];
 % calculate the background subtracted images
-% the vectorised version
-tic
-set(handles.stt_status, 'string', 'calculating the background subtraction. Please wait...');drawnow;
-back_idx = logical(handles.param.chk_back(1:handles.nC));
-offset_idx = logical(handles.param.chk_offset(1:handles.nC));
-switch handles.back_method
-    case 'single' %subtract a single measured value
-        handles.backT = zeros(1,1,handles.nC,1,1);
-        handles.backT(1,1,back_idx,1,1) =  handles.param.back(back_idx);
-        handles.backT(1,1,offset_idx,1,1) =  handles.param.offset(offset_idx);
-        handles.stdT(1,1,back_idx,1,1) =  handles.param.back_std(back_idx);
-    case 'frame' % subtract a measured value from each frame
-        handles.backT = zeros(1, 1, handles.nC, 1, handles.nT);
-        handles.stdT = zeros(1, 1, handles.nC, 1, handles.nT);
-        ROI = handles.images.filtered(handles.p1(2):handles.p1(2)+handles.offset(2), handles.p1(1):handles.p1(1)+handles.offset(1),1:handles.nC,iZ,1:handles.newnT);
-        ROI = reshape(ROI,[(handles.offset(1)+1).*(handles.offset(2)+1),1,handles.nC,1,handles.newnT]);
-        handles.backT(1,1,1:handles.nC,1,1:handles.newnT) = mean(ROI,1);
-        handles.stdT(1,1,1:handles.nC,1,1:handles.newnT) = std(ROI,1);
-        handles.backT(1,1,offset_idx,1,1:handles.newnT) = repmat(handles.param.offset(offset_idx), [1 1 1 1 handles.newnT]);
-    case 'field' % calculate the background across the field by image opening
-        radius = str2double(get(handles.txt_back_field_radius,'String'));
-        handles.back_image = imopen(handles.images.filtered, strel('disk',radius));
-end
-toc
-%handles.images.subtracted = bsxfun(@minus, handles.images.filtered, handles.backT);
-% handles.vectorised = handles.images.subtracted;
+% % % % the vectorised version
+% % % set(handles.stt_status, 'string', 'calculating the background subtraction. Please wait...');drawnow;
+% % % back_idx = logical(handles.param.chk_back(1:handles.nC));
+% % % % offset_idx = logical(handles.param.chk_offset(1:handles.nC));
+% % % switch handles.back_method
+% % %     case 'single' %subtract a single measured value
+% % %         handles.backT = zeros(1,1,handles.nC,1,1);
+% % %         handles.backT(1,1,back_idx,1,1) =  handles.param.back(back_idx);
+% % % %         handles.backT(1,1,offset_idx,1,1) =  handles.param.offset(offset_idx);
+% % %         handles.stdT(1,1,back_idx,1,1) =  handles.param.back_std(back_idx);
+% % %     case 'frame' % subtract a measured value from each frame
+% % %         handles.backT = zeros(1, 1, handles.nC, 1, handles.nT);
+% % %         handles.stdT = zeros(1, 1, handles.nC, 1, handles.nT);
+% % %         ROI = handles.images.filtered(handles.p1(2):handles.p1(2)+handles.offset(2), handles.p1(1):handles.p1(1)+handles.offset(1),1:handles.nC,iZ,1:handles.newnT);
+% % %         ROI = reshape(ROI,[(handles.offset(1)+1).*(handles.offset(2)+1),1,handles.nC,1,handles.newnT]);
+% % %         handles.backT(1,1,1:handles.nC,1,1:handles.newnT) = mean(ROI,1);
+% % %         handles.stdT(1,1,1:handles.nC,1,1:handles.newnT) = std(ROI,1);
+% % % %         handles.backT(1,1,offset_idx,1,1:handles.newnT) = repmat(handles.param.offset(offset_idx), [1 1 1 1 handles.newnT]);
+% % %     case 'field' % calculate the background across the field by image opening
+% % %         radius = str2double(get(handles.txt_back_field_radius,'String'));
+% % %         handles.back_image = imopen(handles.images.filtered, strel('disk',radius));
+% % % end
+% % % % handles.vectorised = handles.images.subtracted;
 % the loop version
-tic
+
 for iC = 1:handles.nC
     set(handles.stt_status, 'string', ['calculating the background subtraction for channel ' num2str(iC) '. Please wait...']);drawnow;
     if handles.param.chk_back(iC) == 1
@@ -1765,13 +1950,13 @@ for iC = 1:handles.nC
                 handles.images.subtracted = handles.images.filtered-handles.back_image;
                 handles.images.subtracted(handles.images.subtracted < 0) = 0;
         end
-    elseif handles.param.chk_offset(iC) == 1 % subtract a user entered value
-        handles.images.subtracted(1:handles.newnY,1:handles.newnX,iC,1:handles.newnZ,1:handles.newnT) = handles.images.filtered(1:handles.newnY,1:handles.newnX,iC,1:handles.newnZ,1:handles.newnT)-handles.param.offset(iC);
+%     elseif handles.param.chk_offset(iC) == 1 % subtract a user entered value
+%         handles.images.subtracted(1:handles.newnY,1:handles.newnX,iC,1:handles.newnZ,1:handles.newnT) = handles.images.filtered(1:handles.newnY,1:handles.newnX,iC,1:handles.newnZ,1:handles.newnT)-handles.param.offset(iC);
     else %don't subtract anything
         handles.images.subtracted(1:handles.newnY,1:handles.newnX,iC,1:handles.newnZ,1:handles.newnT) = handles.images.filtered(1:handles.newnY,1:handles.newnX,iC,1:handles.newnZ,1:handles.newnT);
     end
 end
-toc
+
 if get(handles.chk_auto_corr, 'value') == 1
     % subtract a scaled version of the autofluorescence channel (after
     % background subtraction) from channel 1
@@ -1786,14 +1971,7 @@ end
 set(handles.stt_status, 'string', 'Setting negative values to zero. Please wait...');drawnow;
 handles.images.subtracted(handles.images.subtracted < 0) = 0;
 set(handles.stt_status, 'string', 'Finished background subtraction');drawnow;
-temptot = mean(mean(handles.images.subtracted(:,:,1:handles.minnC,:,:), 1),2);
-handles.totals(1:handles.newnT,1:handles.minnC,1:handles.newnZ,3,1) = reshape(permute(temptot,[5 4 3 2 1]), handles.newnT, handles.minnC, handles.newnZ) ;
-guidata(hObject, handles);
-% update the thumbnails
-handles.thumbnails.subtracted = fnc_thumbnail_make(handles.images.subtracted(:,:,:,1,round(handles.nT/2)), 'subtracted',handles);
-handles = fnc_thumbnail_display('subtracted',handles);
-set(handles.pop_display_image, 'Value', find(strcmpi(get(handles.pop_display_image, 'String'), 'subtracted')));
-handles = fnc_display_image(handles);
+
 
 %--------------------------------------------------------------------------
 % BLEED-THROUGH CORRECTION FOR AUTOFLUORESCENCE
@@ -1871,38 +2049,38 @@ handles.expt.time_interval = str2double(get(hObject,'String'));
 guidata(hObject, handles);
 fnc_param_save(handles)
 
-function btn_tip_initialise_Callback(hObject, eventdata, handles)
-% get the channel used to segment the outline
-options = get(handles.pop_tip_trace_channel, 'string');
-options_idx = get(handles.pop_tip_trace_channel, 'value');
-handles.param.trace_channel = str2double(options{options_idx});
-% get the channelcontaining a spitzenkorper signal
-options = get(handles.pop_tip_spk_channel, 'string');
-options_idx = get(handles.pop_tip_spk_channel, 'value');
-handles.param.spk_channel = str2double(options{options_idx});
-% get the time interval
-handles.param.time_interval = str2double(get(handles.txt_time_interval, 'String'));
-handles.param.TimeStamps = [0:handles.nT-1].*handles.param.time_interval;
-% update the handles structure
-guidata(gcbo,handles);
-% save the parameters
-fnc_param_save(handles)
-% display the segmentation controls
-if handles.param.trace_channel >0
-    set(handles.segment_controls, 'enable','on')
-    handles = fnc_segment_method(handles);
-    % clear the axes
-    h = findobj(gcf, 'Type','line','color','k','linestyle',':');
-    delete(h)
-    % set up the table   
-else
-    set(handles.segmentation_controls, 'enable','off')
-    set(handles.filter_controls, 'enable','off');
-    set(handles.tip_trace_controls,'enable','off');
-    set(handles.tip_profile_controls,'enable','off');
-end
-guidata(gcbo,handles);
-set(handles.stt_status, 'string', 'Tracker initialised');drawnow;
+% function btn_tip_initialise_Callback(hObject, eventdata, handles)
+% % get the channel used to segment the outline
+% options = get(handles.pop_tip_trace_channel, 'string');
+% options_idx = get(handles.pop_tip_trace_channel, 'value');
+% handles.param.trace_channel = str2double(options{options_idx});
+% % get the channelcontaining a spitzenkorper signal
+% options = get(handles.pop_tip_spk_channel, 'string');
+% options_idx = get(handles.pop_tip_spk_channel, 'value');
+% handles.param.spk_channel = str2double(options{options_idx});
+% % get the time interval
+% handles.param.time_interval = str2double(get(handles.txt_time_interval, 'String'));
+% handles.param.TimeStamps = [0:handles.nT-1].*handles.param.time_interval;
+% % update the handles structure
+% guidata(gcbo,handles);
+% % save the parameters
+% fnc_param_save(handles)
+% % display the segmentation controls
+% if handles.param.trace_channel >0
+%     set(handles.segment_controls, 'enable','on')
+%     handles = fnc_segment_method(handles);
+%     % clear the axes
+%     h = findobj(gcf, 'Type','line','color','k','linestyle',':');
+%     delete(h)
+%     % set up the table   
+% else
+%     set(handles.segmentation_controls, 'enable','off')
+%     set(handles.filter_controls, 'enable','off');
+%     set(handles.tip_trace_controls,'enable','off');
+%     set(handles.tip_profile_controls,'enable','off');
+% end
+% guidata(gcbo,handles);
+% set(handles.stt_status, 'string', 'Tracker initialised');drawnow;
 
 % --------------------------------------------------------------------------
 % TIP SEGMENTATION USING THRESHOLDING
@@ -2269,7 +2447,7 @@ x = handles.tip_selected_points(:,1);
 y = handles.tip_selected_points(:,2);
 % loop through each image
 for iT = 1:handles.nT
-    set(handles.stt_status,'string', ['Extracting the tip for image ' num2str(iT) '. Please wait...']);drawnow;
+    set(handles.stt_status,'string', ['Extracting the tips for image ' num2str(iT) '. Please wait...']);drawnow;
     % set up an accumulator image for the boundaries
     boundary_im = zeros(size(handles.images.segmented,1),size(handles.images.segmented,2));
     % increment the sliders and display the new image
@@ -2427,7 +2605,7 @@ for iH = 1:length(idxA)
     ID = handles.tip_table.ID(idxA(iH));
     rmax = handles.tip_table.rmax(idxA(iH));
     boundary = handles.tip_table.boundary{idxA(iH)};
-    dc = round(rmax.*0.5); % use an approximate 45 degree separation for the test points of the osculating circle
+    dc = round(rmax.*0.75); % use an approximate 45 degree separation for the test points of the osculating circle
     % set up the output arrays
     R = ones(size(boundary,1),1)*inf; % radius
     K = zeros(size(boundary,1),1); % curvature
@@ -2581,13 +2759,16 @@ p_length = str2double(get(handles.txt_tip_profile_length, 'String'));
 % get the length in microns
 % p_length = handles.param.profile_length./handles.param.pixel_size(1);
 % mask the distance transform and feature map by the region
-switch method
-    case 'nearest'
-        for iT = 1:handles.nT
-            % get the intensity, boundary and tip images for this time point
-            im = handles.images.subtracted(:,:,1,1,iT);
-            boundary = handles.images.boundary(:,:,1,1,iT);
-            tip = handles.images.tip(:,:,1,1,iT);
+for iT = 1:handles.nT
+    set(handles.stt_status,'String',['Calculating profile for tips in time point ' num2str(iT) '. Please wait...'])
+    % get the intensity, boundary and tip images for this time point
+    im = handles.images.subtracted(:,:,1,1,iT);
+    % smooth the intensity image
+    im = imfilter(im,fspecial('Gaussian',[p_sigma*3 p_sigma*3], p_sigma));
+    boundary = handles.images.boundary(:,:,1,1,iT);
+    tip = handles.images.tip(:,:,1,1,iT);
+    switch method
+        case 'nearest'
             % calculate a mask from the boundary distance spanning the distance
             % over which to aggregate pixel intensities
             mask = handles.images.boundary_D(:,:,1,1,iT)<=p_erode;
@@ -2603,125 +2784,230 @@ switch method
             V(idx) = [];
             % extract the tip ID from the boundary image
             ID = boundary(FMidx);
-            % loop through each hypha
-            for iH = 1:max(ID)
-                % extract each hypha in turn
-                Hidx = ID == iH;
+        case 'erode'
+            % calculate an offset internal profile at a set distance from the boundary
+            offset = handles.images.boundary_D(:,:,1,1,iT) > p_erode-0.5 & handles.images.boundary_D(:,:,1,1,iT) <= p_erode+0.5;
+            % find the nearest pixel on the boundary from the mask
+            [~, FM] = bwdist(offset,'euclidean');
+            % apply the mask to the Feature Map to extract the nearest pixel index on the
+            % boundary for each pixel to be aggregated
+            FMidx = FM(boundary>0);
+            % extract the pixel values for the offset boundary
+            V = im(FMidx);
+            % extract the tip ID from the boundary image
+            ID = boundary(boundary>0);
+        case 'normals'
+            % get the [x,y] coordinates of each pixel on the boundary as the start
+            % point for a profile
+            [ys,xs] = find(boundary);
+            % calculate an offset internal boundary at a set distance from the actual boundary
+            offset = handles.images.boundary_D(:,:,1,1,iT) > p_erode-0.5 & handles.images.boundary_D(:,:,1,1,iT) <= p_erode+0.5;
+            % find the nearest pixel on the boundary from the mask
+            [~, FM] = bwdist(offset,'euclidean');
+            % apply the offset boundary to the Feature Map to extract the nearest pixel index on the
+            % boundary for each pixel to give the end point of each profile
+            Lidx = FM(boundary>0);
+            % extract the [x,y] co-ordinates
+            [ye,xe] = ind2sub(size(boundary),Lidx);
+            % loop through each pair of co-ordinates and extract an
+            % interpolated profile
+            i = 0;
+            Pmn = [];
+            Pmx = [];
+            Pn = [];
+            for iP = 1:length(ys)
+                i = i+1;
+                P = improfile(im,[xs(iP) xe(iP)],[ys(iP) ye(iP)],p_erode*2+1,'bilinear');
+                Pmn(i) = mean(P);
+                Pmx(i) = max(P);
+                Pn(i) = 1;
+            end
+            % extract the tip ID from the boundary image
+            ID = boundary(boundary>0);
+    end
+    % loop through each hypha
+    for iH = 1:max(ID)
+        % extract each hypha in turn
+        Hidx = ID == iH;
+        switch method
+            case 'nearest'
                 % calculate the group statistics for each profile (initially
                 % ordered by linear pixel index)
                 [mn,mx,n] = grpstats(V(Hidx),FMidx(Hidx),{'mean','max','numel'});
-                % get the row index into the main results table
-                r = handles.tip_table.T == iT & handles.tip_table.ID == iH;
-                if ~isempty(r) && handles.tip_table.active(r) == 1 && ~isempty(handles.tip_table.radius(r))
-                    % get the conversion between linear index and position around
-                    % the boundary
-                    [~,B_idx] = sort(handles.tip_table.B_idx{r});
-                    [~,B_order] = sort(B_idx);
-                    % update the table with the results, re-ordered to match the
-                    % boundary sequence order
-                    mn = mn(B_order);
-                    mx = mx(B_order);
-                    n = n(B_order);
-                    % resample a fixed distance from the apex along each arm and
-                    % update the results table
-                    x = linspace(-p_length,p_length,p_length*2+1);
-                    handles.tip_table.B_mean{r} = interp1(handles.tip_table.B_length{r},mn,x)';
-                    handles.tip_table.B_max{r} = interp1(handles.tip_table.B_length{r},mx,x)';
-                    handles.tip_table.B_n{r} = interp1(handles.tip_table.B_length{r},n,x)';
-                    [F,GoF] = fnc_tip_profile_fit(x,handles.tip_table.B_max{r},handles.tip_table.B_n{r});
-                    % get the index of the peak into the boundary array
-                    [~,Pidx] = min(abs(handles.tip_table.B_length{r}-F.b1));
-                    handles.tip_table.peak_value(r) = F.a1;
-                    handles.tip_table.peak_displacement(r) = F.b1;
-                    handles.tip_table.peak_coordinates(r,1:2) = handles.tip_table.boundary{r}(Pidx,:);
-                    handles.tip_table.peak_width(r) = F.c1;
-                    handles.tip_table.peak_offset(r) = F.d1;
-                    handles.tip_table.peak_GoF{r} = GoF;
-                    handles.tip_table.peak_ci{r} = confint(F);
-                end
-                if iT == 1
-                    figure
-                    plot(F,x',handles.tip_table.B_max{r},double(handles.tip_table.B_n{r})<=2)
-                end
+            case 'erode'
+                mn = V(Hidx);
+                mx = V(Hidx);
+                n = ones(size(V(Hidx)));
+            case 'normals'
+                mn = Pmn(Hidx);
+                mx = Pmx(Hidx);
+                n = Pn(Hidx);
+        end
+        % get the row index into the main results table
+        r = handles.tip_table.T == iT & handles.tip_table.ID == iH;
+        if ~isempty(r) && handles.tip_table.active(r) == 1 && ~isempty(handles.tip_table.radius(r))
+            % get the conversion between linear index and position around
+            % the boundary
+            [~,B_idx] = sort(handles.tip_table.B_idx{r});
+            [~,B_order] = sort(B_idx);
+            % update the table with the results, re-ordered to match the
+            % boundary sequence order
+            mn = mn(B_order);
+            mx = mx(B_order);
+            n = n(B_order);
+            % resample a fixed distance from the apex along each arm and
+            % update the results table
+            x = linspace(-p_length,p_length,p_length*2+1);
+            handles.tip_table.B_mean{r} = interp1(handles.tip_table.B_length{r},mn,x)';
+            handles.tip_table.B_max{r} = interp1(handles.tip_table.B_length{r},mx,x)';
+            handles.tip_table.B_n{r} = interp1(handles.tip_table.B_length{r},n,x)';
+            [F,GoF] = fnc_tip_profile_fit(x,handles.tip_table.B_max{r},handles.tip_table.B_n{r});
+            % get the index of the peak into the boundary array
+            [~,Pidx] = min(abs(handles.tip_table.B_length{r}-F.b1));
+            handles.tip_table.peak_value(r) = F.a1;
+            handles.tip_table.peak_displacement(r) = F.b1;
+            handles.tip_table.peak_coordinates(r,1:2) = handles.tip_table.boundary{r}(Pidx,:);
+            handles.tip_table.peak_width(r) = F.c1;
+            handles.tip_table.peak_offset(r) = F.d1;
+            handles.tip_table.peak_GoF{r} = GoF;
+            handles.tip_table.peak_ci{r} = confint(F);
+        end
+        if iT == 1
+            figure
+            switch method
+                case 'nearest'
+                    plot(F,x',handles.tip_table.B_max{r},double(handles.tip_table.B_n{r})<=3)
+                otherwise
+                    plot(F,x',handles.tip_table.B_max{r})
             end
         end
-    case 'erode'
-        % only trace active tips
-        idxA = find(handles.tip_table.active);
-        for iH = 1:length(idxA)
-            iT = handles.tip_table.T(idxA(iH));
-            iZ = handles.tip_table.Z(idxA(iH));
-            iC = handles.tip_table.C(idxA(iH));
-            ID = handles.tip_table.ID(idxA(iH));
-            rmax = handles.tip_table.rmax(idxA(iH));
-            boundary = handles.tip_table.boundary{idxA(iH)};
-            set(handles.stt_status,'string', ['Extracting the profile for image ' num2str(iT) ' of tip ' num2str(iH) '. Please wait...']);drawnow;
-            apex = handles.tip_table(idxA(iH)).apex;
-            hypha_all = handles.images.segmented(:,:,iC,iZ,iT);
-            tip = handles.images.tip(:,:,1,1,iT)==iH;
-            % find profile
-            [cr,cl,nr,nl,xce,yce,imthe] = BOPlantTipProfile2D(squeeze(hypha_all),tip,boundary,apex,p_length,p_erode);
-%             handles.tip_results{iH,iT}.xce = xce;
-%             handles.tip_results{iH,iT}.yce = yce;
-%             handles.tip_results{iH,iT}.crp = cr;
-%             handles.tip_results{iH,iT}.clp = cl;
-            % Distance
-            imthm = squeeze(hypha_all);
-            imthm(imthe) = 0;
-            imd = bwdist(imthm,'Euclidean');
-            imf = squeeze(handles.images.subtracted(:,:,iC,iZ,iT));
-            % convert the co-ordinates to physical length
-            d = diff(cr);
-            dr = cumsum(hypot(d(:,1),d(:,2)));
-            d = diff(cl);
-            dl = cumsum(hypot(d(:,1),d(:,2)));
-            % reorder and join the left and right profiles
-            xp = [-flipud(dl); 0; dr];
-            % convert to microns
-            xp = xp.*handles.param.pixel_size(1);
-            yp = zeros(nl+nr-1,1);
-            ypd = zeros(nl+nr-1,1);
-            boundary = zeros(nl+nr-1,2);
-            for j=1:nl
-                yp(j) = imf(cl(nl-j+1,1),cl(nl-j+1,2));
-                ypd(j) = imd(cl(nl-j+1,1),cl(nl-j+1,2));
-                boundary(j,1) = cl(nl-j+1,1);
-                boundary(j,2) = cl(nl-j+1,2);
-            end
-            for j=2:nr
-                yp(j+nl-1) = imf(cr(j,1),cr(j,2));
-                ypd(j+nl-1) = imd(cr(j,1),cr(j,2));
-                boundary(j+nl-1,1) = cr(j,1);
-                boundary(j+nl-1,2) = cr(j,2);
-            end
-            % Interpolate
-            limit = max(abs(xp));
-            res = limit/p_length;
-            xp2 = (-limit:res:limit)';
-            yp2 = interp1(xp,yp,xp2,'linear','extrap');
-            ypd2 = interp1(xp,ypd,xp2,'linear','extrap');
-            xp = xp2; yp = yp2; ypd = ypd2;
-            ci = 1:(size(boundary,1)-1)/(size(xp,1)-1):size(boundary,1);
-            cp(:,1) = interp1(1:size(boundary,1),boundary(:,1),ci);
-            cp(:,2) = interp1(1:size(boundary,1),boundary(:,2),ci);
-            % Calculate profile line parameters
-            [a1,a2,a3,a4,cfun,er] = BOCurvilinearStructureProfileParameters2D(xp,yp);
-            % Calculate estimated profile coordinaties
-%             ypfit = feval(cfun,xp);
-            % update the results
-%             handles.tip_results{iH,iT}.fit_coefficients = [a1,a2,a3,a4];
-%             handles.tip_results{iH,iT}.er = struct2array(er);
-%             handles.tip_results{iH,iT}.coords = [xp yp ypd];
-%             handles.tip_results{iH,iT}.cp = cp;
-%             handles.tip_results{iH,iT}.ypfit = ypfit;
-handles.tip_table.peak_value(iH) = a1;
-handles.tip_table.peak_displacement(iH) = a2;
-handles.tip_table.peak_coordinates(iH,1:2) = handles.tip_table.boundary{r}(Pidx,:);
-handles.tip_table.peak_width(iH) = a3;
-handles.tip_table.peak_offset(iH) = a4;
-handles.tip_table.peak_GoF{iH} = er;
-handles.tip_table.peak_ci{iH} = confint(cfun);
-        end
+    end
+%     % loop through each hypha
+%     for iH = 1:max(ID)
+%         % extract each hypha in turn
+%         Hidx = ID == iH;
+%         mn = V(Hidx);
+%         mx = V(Hidx);
+%         n = ones(size(V(Hidx)));
+%         %                 % calculate the group statistics for each profile (initially
+%         %                 % ordered by linear pixel index)
+%         %                 [mn,mx,n] = grpstats(V(Hidx),FMidx(Hidx),{'mean','max','numel'})
+%         % get the row index into the main results table
+%         r = handles.tip_table.T == iT & handles.tip_table.ID == iH;
+% %                         [iH iT ~isempty(r)]
+% %                         handles.tip_table.active(r)
+% %                         ~isempty(handles.tip_table.radius(r))
+%         if ~isempty(r) && ~isempty(handles.tip_table.active(r)) && ~isempty(handles.tip_table.radius(r))
+%             % get the conversion between linear index and position around
+%             % the boundary
+%             [~,B_idx] = sort(handles.tip_table.B_idx{r});
+%             [~,B_order] = sort(B_idx);
+%             % update the table with the results, re-ordered to match the
+%             % boundary sequence order
+%             mn = mn(B_order);
+%             mx = mx(B_order);
+%             n = n(B_order);
+%             % resample a fixed distance from the apex along each arm and
+%             % update the results table
+%             x = linspace(-p_length,p_length,p_length*2+1);
+%             handles.tip_table.B_mean{r} = interp1(handles.tip_table.B_length{r},mn,x)';
+%             handles.tip_table.B_max{r} = interp1(handles.tip_table.B_length{r},mx,x)';
+%             handles.tip_table.B_n{r} = interp1(handles.tip_table.B_length{r},n,x)';
+%             [F,GoF] = fnc_tip_profile_fit(x,handles.tip_table.B_max{r},handles.tip_table.B_n{r});
+%             % get the index of the peak into the boundary array
+%             [~,Pidx] = min(abs(handles.tip_table.B_length{r}-F.b1));
+%             handles.tip_table.peak_value(r) = F.a1;
+%             handles.tip_table.peak_displacement(r) = F.b1;
+%             handles.tip_table.peak_coordinates(r,1:2) = handles.tip_table.boundary{r}(Pidx,:);
+%             handles.tip_table.peak_width(r) = F.c1;
+%             handles.tip_table.peak_offset(r) = F.d1;
+%             handles.tip_table.peak_GoF{r} = GoF;
+%             handles.tip_table.peak_ci{r} = confint(F);
+%             %                     if iT == 1
+%             %                         figure
+%             %                         plot(F,x',handles.tip_table.B_max{r})
+%             %                     end
+%             
+%         end
+        %             end
+        %         case 'old'
+        %             % only trace active tips
+        %             idxA = find(handles.tip_table.active);
+        %             for iH = 1:length(idxA)
+        %                 iT = handles.tip_table.T(idxA(iH));
+        %                 iZ = handles.tip_table.Z(idxA(iH));
+        %                 iC = handles.tip_table.C(idxA(iH));
+        %                 ID = handles.tip_table.ID(idxA(iH));
+        %                 rmax = handles.tip_table.rmax(idxA(iH));
+        %                 boundary = handles.tip_table.boundary{idxA(iH)};
+        %                 set(handles.stt_status,'string', ['Extracting the profile for image ' num2str(iT) ' of tip ' num2str(iH) '. Please wait...']);drawnow;
+        %                 apex = handles.tip_table(idxA(iH)).apex;
+        %                 hypha_all = handles.images.segmented(:,:,iC,iZ,iT);
+        %                 tip = handles.images.tip(:,:,1,1,iT)==iH;
+        %                 % find profile
+        %                 [cr,cl,nr,nl,xce,yce,imthe] = BOPlantTipProfile2D(squeeze(hypha_all),tip,boundary,apex,p_length,p_erode);
+        %                 %             handles.tip_results{iH,iT}.xce = xce;
+        %                 %             handles.tip_results{iH,iT}.yce = yce;
+        %                 %             handles.tip_results{iH,iT}.crp = cr;
+        %                 %             handles.tip_results{iH,iT}.clp = cl;
+        %                 % Distance
+        %                 imthm = squeeze(hypha_all);
+        %                 imthm(imthe) = 0;
+        %                 imd = bwdist(imthm,'Euclidean');
+        %                 imf = squeeze(handles.images.subtracted(:,:,iC,iZ,iT));
+        %                 % convert the co-ordinates to physical length
+        %                 d = diff(cr);
+        %                 dr = cumsum(hypot(d(:,1),d(:,2)));
+        %                 d = diff(cl);
+        %                 dl = cumsum(hypot(d(:,1),d(:,2)));
+        %                 % reorder and join the left and right profiles
+        %                 xp = [-flipud(dl); 0; dr];
+        %                 % convert to microns
+        %                 xp = xp.*handles.param.pixel_size(1);
+        %                 yp = zeros(nl+nr-1,1);
+        %                 ypd = zeros(nl+nr-1,1);
+        %                 boundary = zeros(nl+nr-1,2);
+        %                 for j=1:nl
+        %                     yp(j) = imf(cl(nl-j+1,1),cl(nl-j+1,2));
+        %                     ypd(j) = imd(cl(nl-j+1,1),cl(nl-j+1,2));
+        %                     boundary(j,1) = cl(nl-j+1,1);
+        %                     boundary(j,2) = cl(nl-j+1,2);
+        %                 end
+        %                 for j=2:nr
+        %                     yp(j+nl-1) = imf(cr(j,1),cr(j,2));
+        %                     ypd(j+nl-1) = imd(cr(j,1),cr(j,2));
+        %                     boundary(j+nl-1,1) = cr(j,1);
+        %                     boundary(j+nl-1,2) = cr(j,2);
+        %                 end
+        %                 % Interpolate
+        %                 limit = max(abs(xp));
+        %                 res = limit/p_length;
+        %                 xp2 = (-limit:res:limit)';
+        %                 yp2 = interp1(xp,yp,xp2,'linear','extrap');
+        %                 ypd2 = interp1(xp,ypd,xp2,'linear','extrap');
+        %                 xp = xp2; yp = yp2; ypd = ypd2;
+        %                 ci = 1:(size(boundary,1)-1)/(size(xp,1)-1):size(boundary,1);
+        %                 cp(:,1) = interp1(1:size(boundary,1),boundary(:,1),ci);
+        %                 cp(:,2) = interp1(1:size(boundary,1),boundary(:,2),ci);
+        %                 % Calculate profile line parameters
+        %                 [a1,a2,a3,a4,cfun,er] = BOCurvilinearStructureProfileParameters2D(xp,yp);
+        %                 % Calculate estimated profile coordinaties
+        %                 %             ypfit = feval(cfun,xp);
+        %                 % update the results
+        %                 %             handles.tip_results{iH,iT}.fit_coefficients = [a1,a2,a3,a4];
+        %                 %             handles.tip_results{iH,iT}.er = struct2array(er);
+        %                 %             handles.tip_results{iH,iT}.coords = [xp yp ypd];
+        %                 %             handles.tip_results{iH,iT}.cp = cp;
+        %                 %             handles.tip_results{iH,iT}.ypfit = ypfit;
+        %                 handles.tip_table.peak_value(iH) = a1;
+        %                 handles.tip_table.peak_displacement(iH) = a2;
+        %                 handles.tip_table.peak_coordinates(iH,1:2) = handles.tip_table.boundary{r}(Pidx,:);
+        %                 handles.tip_table.peak_width(iH) = a3;
+        %                 handles.tip_table.peak_offset(iH) = a4;
+        %                 handles.tip_table.peak_GoF{iH} = er;
+        %                 handles.tip_table.peak_ci{iH} = confint(cfun);
+        %             end
+%     end
 end
 
 function [F, GoF] = fnc_tip_profile_fit(x,y,n)
@@ -2735,8 +3021,10 @@ fit_options.StartPoint = [1 0 10 0.1];
 fit_options.Lower = [0 -Inf 0 0];
 % weight the values by the number of points asociated with each boundary pixel
 fit_options.Weights = double(n);
-% exclude boundary pixels with less than 2 associated points
-fit_options.Exclude = double(n)<=3;
+if max(n) >3
+    %     exclude boundary pixels with less than 2 associated points
+    fit_options.Exclude = double(n)<=3;
+end
 [F,GoF] = fit(x',double(y),model,fit_options);
 
 
@@ -3661,22 +3949,24 @@ if get(handles.chk_tip_plot_peak_peak_vector, 'value') && ~isempty(idx2) && ~ise
     Vy1 = handles.tip_table.peak_coordinates(idx,1)-handles.tip_table.peak_coordinates(idx2,1);
     h = quiver(ax,handles.tip_table.peak_coordinates(idx,2),handles.tip_table.peak_coordinates(idx,1), ...
         -Vx1*vector_size,-Vy1*vector_size,'b','AutoScale','off');
-    set(h, 'MaxHeadSize',max_head_size)
-    
+    set(h, 'MaxHeadSize',max_head_size)   
     set(h, 'Tag','tip_peak_peak_vector');
     h = plot(ax,handles.tip_table.peak_coordinates(idx,2),handles.tip_table.peak_coordinates(idx,1), ...
         'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','b');
     set(h, 'Tag','tip_peak_peak_vector')
 end
+if get(handles.chk_tip_plot_spk_spk_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.spk(idx))
+    Vx1 = handles.tip_table.spk(idx,2)-handles.tip_table.spk(idx2,2);
+    Vy1 = handles.tip_table.spk(idx,1)-handles.tip_table.spk(idx2,1);
+    h = quiver(ax,handles.tip_table.spk(idx,2),handles.tip_table.spk(idx,1), ...
+        -Vx1*vector_size,-Vy1*vector_size,'y','AutoScale','off');
+    set(h, 'MaxHeadSize',max_head_size)   
+    set(h, 'Tag','tip_spk_spk_vector');
+    h = plot(ax,handles.tip_table.spk(idx,2),handles.tip_table.spk(idx,1), ...
+        'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','y');
+    set(h, 'Tag','tip_peak_peak_vector')
+end
 
-%             if get(handles.chk_tip_plot_peak_peak_vector, 'value')
-%                 Vx1 = Px1-Px2;
-%                 Vy1 = Py1-Py2;
-%                 h = quiver(ax,Px1,Py1,-Vx1,-Vy1,'m','AutoScaleFactor',vector_size,'MaxHeadSize',0.6);%,'Marker','o','MarkerSize',sz,'MarkerEdgeColor','k','MarkerFaceColor','r');
-%                 set(h, 'Tag','tip_peak_peak_vector');
-%                 h = plot(ax,Px2,Py2,'Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','m');
-%                 set(h, 'Tag','tip_peak_peak_vector')
-%             end
 %             if get(handles.chk_tip_plot_spk_spk_vector, 'value') && isfield(handles.tip_results{iH,iT}, 'xs1')
 %                 Vx1 = Sx1-Sx2;
 %                 Vy1 = Sy1-Sy2;
@@ -3922,9 +4212,9 @@ if isfield(handles,'tip_results') && ~isempty(handles.tip_results)
 end
 
 function btn_test_Callback(hObject, eventdata, handles)
-handles = fnc_tip_coordinate_system(handles);
+%handles = fnc_tip_coordinate_system(handles);
 
-%  assignin('base','T',handles.tip_table)
+assignin('base','T',handles.tip_table)
 %size(handles.images.midline)
 % 
 % handles.thumbnails.midline = fnc_thumbnail_make(imdilate(handles.images.midline(:,:,1,1,round(handles.nT/2)),ones(7)), 'midline',handles);
@@ -4311,7 +4601,6 @@ if ~isgraphics(handles.h_colorbar)
 end
 cd(handles.dir_in)
 
-
 function btn_save_image_Callback(hObject, eventdata, handles)
 cd(handles.dir_out_images)
 [fileout,~] = uiputfile('*.png','Save current image');
@@ -4410,7 +4699,6 @@ cd(handles.dir_out_images)
 fnc_save_all_images(fout,handles);
 cd(handles.dir_in)
 
-
 function fnc_save_all_images(name,handles)
 set(handles.stt_status,'String','Saving full resolution images. Please wait...');drawnow;
 iT = get(handles.sld_T,'Value');
@@ -4433,6 +4721,57 @@ for iT = 1:handles.nT-1
 end
 delete(hfig)
 set(handles.stt_status,'String',['Image saved']);drawnow;
+
+% -------------------------------------------------------------------------
+% SAVE PANELS
+% ------------------------------------------------------------------------
+function btn_save_panels_Callback(hObject, eventdata, handles)
+dpi = 150;
+% make sure all the labels are in a compatible font
+h = findobj(gcf,'Type','UIControl');
+set(h,'FontName','Helvetica','FontUnits','pixels','FontSize',11);
+h = findobj(gcf,'Type','UIPanel');
+set(h,'FontName','Helvetica','FontUnits','pixels','FontSize',11);
+[fout,pathname] = uiputfile('*.png','Panel output');
+[pathstr, name, ext] = fileparts(fout);
+fileout = [name '_all'];
+cd(pathname)
+export_fig(fileout,'-r300', '-png',handles.Tip_Tracker)
+
+% save every panel as a png
+AllChildren = get(gcf,'children');
+n = 0;
+for iP = 1:numel(AllChildren)
+    EachChild = get(AllChildren(iP));
+    if isfield(EachChild,'Type')
+        if strcmpi(EachChild.Type,'uipanel')
+            n = n+1;
+            PanelTags{n,1} = EachChild.Tag;
+        end
+    end
+end
+
+for iP = 1:numel(PanelTags)
+    fileout = [name '_' PanelTags{iP,1}];
+    if iP == 1
+        % the colorbar is the last panel to be set, so is the first in the
+        % panel list. It will be saved correctly, but has to be deleted to
+        % prevent interference with some of the other panels. So delete at
+        % this point and recreate at the end
+        colorbar(handles.h_colorbar,'off')
+    end
+    % pdf output works from the panel handle
+    export_fig(fileout,['-r' num2str(dpi)],'-pdf','-png',handles.(PanelTags{iP,1}));
+end
+% recreate the colorbar
+handles.h_colorbar = colorbar(handles.ax_colorbar,'location','east','TickDirection','out','TickLength',0.02,'FontSize',8);
+handles.h_colorbar.Label.String = 'intensity';
+handles.h_colorbar.Label.Interpreter = 'none';
+guidata(hObject, handles);
+cd(handles.dir_in)
+set(handles.stt_status,'String','Panels saved');drawnow;
+
+
 
 % -------------------------------------------------------------------------
 % VIEWER OPTIONS
@@ -5289,16 +5628,16 @@ fnc_textbox_background(hObject);
 function txt_ch5_std_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
 
-function txt_ch1_offset_CreateFcn(hObject, eventdata, handles)
-fnc_textbox_background(hObject);
-function txt_ch2_offset_CreateFcn(hObject, eventdata, handles)
-fnc_textbox_background(hObject);
-function txt_ch3_offset_CreateFcn(hObject, eventdata, handles)
-fnc_textbox_background(hObject);
-function txt_ch4_offset_CreateFcn(hObject, eventdata, handles)
-fnc_textbox_background(hObject);
-function txt_ch5_offset_CreateFcn(hObject, eventdata, handles)
-fnc_textbox_background(hObject);
+% function txt_ch1_offset_CreateFcn(hObject, eventdata, handles)
+% fnc_textbox_background(hObject);
+% function txt_ch2_offset_CreateFcn(hObject, eventdata, handles)
+% fnc_textbox_background(hObject);
+% function txt_ch3_offset_CreateFcn(hObject, eventdata, handles)
+% fnc_textbox_background(hObject);
+% function txt_ch4_offset_CreateFcn(hObject, eventdata, handles)
+% fnc_textbox_background(hObject);
+% function txt_ch5_offset_CreateFcn(hObject, eventdata, handles)
+% fnc_textbox_background(hObject);
 
 function txt_auto_corr_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
@@ -5306,6 +5645,32 @@ function pop_auto_corr_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
 
 function txt_back_field_radius_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+
+% profile controls
+function txt_profile_FWHM_R_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+function txt_profile_FWHM_G_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+function txt_profile_FWHM_B_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+function txt_profile_FWHM_peak_R_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+function txt_profile_FWHM_peak_G_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+function txt_profile_FWHM_peak_B_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+function pop_profile_units_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+function txt_micron_per_pix_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+function txt_profile_FWHM_min_CreateFcn(hObject, eventdata, handles)
+fnc_textbox_background(hObject);
+% function txt_profile_FWHM_max_CreateFcn(hObject, eventdata, handles)
+% fnc_textbox_background(hObject);
+% function txt_process_target_width_CreateFcn(hObject, eventdata, handles)
+% fnc_textbox_background(hObject);
+function txt_time_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
 
 % Display contrast controls
@@ -5413,4 +5778,252 @@ function txt_plot_tip_marker_size_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
 
 
-
+% 
+% function txt_profile_FWHM_R_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_R (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_profile_FWHM_R as text
+% %        str2double(get(hObject,'String')) returns contents of txt_profile_FWHM_R as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_profile_FWHM_R_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_R (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% 
+% function txt_profile_FWHM_G_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_G (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_profile_FWHM_G as text
+% %        str2double(get(hObject,'String')) returns contents of txt_profile_FWHM_G as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_profile_FWHM_G_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_G (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% 
+% function txt_profile_FWHM_B_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_B (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_profile_FWHM_B as text
+% %        str2double(get(hObject,'String')) returns contents of txt_profile_FWHM_B as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_profile_FWHM_B_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_B (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% 
+% function txt_profile_FWHM_peak_R_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_peak_R (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_profile_FWHM_peak_R as text
+% %        str2double(get(hObject,'String')) returns contents of txt_profile_FWHM_peak_R as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_profile_FWHM_peak_R_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_peak_R (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% 
+% function txt_profile_FWHM_peak_G_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_peak_G (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_profile_FWHM_peak_G as text
+% %        str2double(get(hObject,'String')) returns contents of txt_profile_FWHM_peak_G as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_profile_FWHM_peak_G_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_peak_G (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% 
+% function txt_profile_FWHM_peak_B_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_peak_B (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_profile_FWHM_peak_B as text
+% %        str2double(get(hObject,'String')) returns contents of txt_profile_FWHM_peak_B as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_profile_FWHM_peak_B_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_peak_B (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% % --- Executes on selection change in pop_profile_units.
+% function pop_profile_units_Callback(hObject, eventdata, handles)
+% % hObject    handle to pop_profile_units (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: contents = cellstr(get(hObject,'String')) returns pop_profile_units contents as cell array
+% %        contents{get(hObject,'Value')} returns selected item from pop_profile_units
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function pop_profile_units_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to pop_profile_units (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: popupmenu controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% % --- Executes on button press in btn_profile_calibration.
+% function btn_profile_calibration_Callback(hObject, eventdata, handles)
+% % hObject    handle to btn_profile_calibration (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% 
+% % --- Executes on button press in btn_profile_FWHM_set_min.
+% function btn_profile_FWHM_set_min_Callback(hObject, eventdata, handles)
+% % hObject    handle to btn_profile_FWHM_set_min (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% 
+% 
+% function txt_profile_FWHM_min_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_min (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_profile_FWHM_min as text
+% %        str2double(get(hObject,'String')) returns contents of txt_profile_FWHM_min as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_profile_FWHM_min_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_profile_FWHM_min (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% % --- Executes on button press in btn_profile.
+% function btn_profile_Callback(hObject, eventdata, handles)
+% % hObject    handle to btn_profile (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% 
+% 
+% function txt_time_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_time (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_time as text
+% %        str2double(get(hObject,'String')) returns contents of txt_time as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_time_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_time (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% 
+% function txt_micron_per_pix_Callback(hObject, eventdata, handles)
+% % hObject    handle to txt_micron_per_pix (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of txt_micron_per_pix as text
+% %        str2double(get(hObject,'String')) returns contents of txt_micron_per_pix as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function txt_micron_per_pix_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to txt_micron_per_pix (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
