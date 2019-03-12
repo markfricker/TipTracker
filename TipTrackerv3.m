@@ -3351,7 +3351,7 @@ switch method
                     % in case there are multiple points nearby, find the
                     % brightest point within some distance
                     mx = max(v(d <= min(d)*2));
-                    idx = v==mx;
+                    idx = find(v==mx, 1);
                     handles.tip_table.spk(r,1:2) = [ridx(idx), cidx(idx)];
                     if ~isempty(boundary)
                         hold on
@@ -3782,90 +3782,6 @@ idx2 = find(handles.tip_table.T == iT+1 & handles.tip_table.Z == iZ & handles.ti
 else
     idx2 = [];
 end
-% get the number of hyphae
-% for iH = 1:length(idx)
-%             % get the co-ordinates for the key landmarks
-%              Ex1 = handles.tip_table.endpoint(idx,2)
-%              Ey1 = handles.tip_table.endpoint(idx,1)
-%             center = handles.tip_results{iH,iT}.center;
-%             Cx1 = center(2);
-%             Cy1 = center(1);
-%             zone = handles.tip_results{iH,iT}.zone;
-%             Zx1 = zone(2);
-%             Zy1 = zone(1);
-%             radius = handles.tip_results{iH,iT}.radius;
-%             c = handles.tip_results{iH,iT}.boundary;
-%             cm = handles.tip_results{iH,iT}.cm;
-%             cr = handles.tip_results{iH,iT}.cr;
-%             cl = handles.tip_results{iH,iT}.cl;
-%             Tx1 = c(cm,2);
-%             Ty1 = c(cm,1);
-%             if isfield(handles.tip_results{iH,iT},'xs1')
-%                 Sx1 = handles.tip_results{iH,iT}.xs1;
-%                 Sy1 = handles.tip_results{iH,iT}.ys1;
-%             else
-%                 Sx2 = [];
-%                 Sy2 = [];
-%             end
-%             if iT<handles.nT && isfield(handles.tip_results{iH,iT+1},'center')
-% %                 endpoint_2 = handles.tip_results{iH,iT+1}.endpoint;
-% %                 Ex2 = endpoint_2(2);
-% %                 Ey2 = endpoint_2(1);
-%                 center_2 = handles.tip_results{iH,iT+1}.center;
-%                 Cx2 = center_2(2);
-%                 Cy2 = center_2(1);
-% %             zone_2 = handles.tip_results{iH,iT+1}.zone;
-% %             Zx2 = zone_2(2);
-% %             Zy2 = zone_2(1);
-%                 c2 = handles.tip_results{iH,iT+1}.boundary;
-%                 cm2 = handles.tip_results{iH,iT+1}.cm;
-%                 Tx2 = c2(cm2,2);
-%                 Ty2 = c2(cm2,1);
-%
-%                 % check that the spk has been identified
-%                 if isfield(handles.tip_results{iH,iT+1},'xs1')
-%                     Sx2 = handles.tip_results{iH,iT+1}.xs1;
-%                     Sy2 = handles.tip_results{iH,iT+1}.ys1;
-%                 else
-%                     Sx2 = [];
-%                     Sy2 = [];
-%                 end
-%             else
-% %                 Ex2 = Ex1;
-% %                 Ey2 = Ey1;
-% %                 Zx2 = Zx1;
-% %                 Zy2 = Zy1;
-%                 Cx2 = Cx1;
-%                 Cy2 = Cy1;
-%                 Tx2 = Tx1;
-%                 Ty2 = Ty1;
-%                 if isfield(handles.tip_results{iH,iT},'xs1')
-%                 Sx2 = Sx1;
-%                 Sy2 = Sy1;
-%                                 else
-%                     Sx2 = [];
-%                     Sy2 = [];
-%                 end
-%             end
-%             % check that there is a Gaussian fit
-%             if isfield(handles.tip_results{iH,1},'cp')
-%                 cp = handles.tip_results{iH,iT}.cp;
-%                 ypfit = handles.tip_results{iH,iT}.ypfit;
-%                 [~,idx] = max(ypfit);
-%                 Px1 = cp(idx,2);
-%                 Py1 = cp(idx,1);
-%                 if iT<handles.nT && isfield(handles.tip_results{iH,iT+1},'cp2')
-%                     ypfit2 = handles.tip_results{iH,iT+1}.ypfit;
-%                     cp2 = handles.tip_results{iH,iT+1}.cp;
-%                     [~,idx2] = max(ypfit2);
-%                     Px2 = cp2(idx2,2);
-%                     Py2 = cp2(idx2,1);
-%                 else
-%                     Px2 = Px1;
-%                     Py2 = Py1;
-%                 end
-%             end
-%
 % plot the osculating circle
 if get(handles.chk_tip_plot_OCC, 'value')
     for k = 1:length(idx) 
@@ -3967,14 +3883,6 @@ if get(handles.chk_tip_plot_spk_spk_vector, 'value') && ~isempty(idx2) && ~isemp
     set(h, 'Tag','tip_peak_peak_vector')
 end
 
-%             if get(handles.chk_tip_plot_spk_spk_vector, 'value') && isfield(handles.tip_results{iH,iT}, 'xs1')
-%                 Vx1 = Sx1-Sx2;
-%                 Vy1 = Sy1-Sy2;
-%                 h = quiver(ax,Sx1,Sy1,-Vx1,-Vy1,'y','AutoScaleFactor',vector_size,'MaxHeadSize',0.6);%,'Marker','o','MarkerSize',sz,'MarkerEdgeColor','k','MarkerFaceColor','g');
-%                 set(h, 'Tag','tip_spk_spk_vector');
-%                 h = plot(ax,Sx2,Sy2,'Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','y');
-%                 set(h, 'Tag','tip_spk_spk_vector')
-%             end
 if get(handles.chk_tip_plot_OCC_apex_vector, 'value')
     Vx1 = handles.tip_table.center(idx,2)-handles.tip_table.apex(idx,2);
     Vy1 = handles.tip_table.center(idx,1)-handles.tip_table.apex(idx,1);
@@ -4009,10 +3917,8 @@ if get(handles.chk_tip_plot_OCC_spk_vector, 'value')
     h = plot(ax,handles.tip_table.spk(idx,2),handles.tip_table.spk(idx,1),'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','y');
     set(h, 'Tag','tip_OCC_spk_vector')
 end
-%         end
-%     end
 drawnow;
-% end
+
 % --------------------------------------------------------------------------
 % PROFILE PLOT OPTIONS
 % --------------------------------------------------------------------------
@@ -4050,11 +3956,11 @@ marker_size = str2double(get(handles.txt_plot_tip_marker_size,'String'));
 if get(handles.chk_tip_plot_profile, 'Value')
     for iH = 1:size(handles.tip_results,1)
         iT = get(handles.sld_T, 'value');
-                if handles.TipIdx(iH) && size(handles.tip_results,2) >=iT && ~isempty(handles.tip_results{iH,iT}) && isfield(handles.tip_results{iH,iT}, 'xce')
-
-%         if isfield(handles.tip_results{iH,iT+1},'xce')
-        % get values from the results array
-        xce = handles.tip_results{iH,iT}.xce;
+        if handles.TipIdx(iH) && size(handles.tip_results,2) >=iT && ~isempty(handles.tip_results{iH,iT}) && isfield(handles.tip_results{iH,iT}, 'xce')
+            
+            %         if isfield(handles.tip_results{iH,iT+1},'xce')
+            % get values from the results array
+            xce = handles.tip_results{iH,iT}.xce;
         yce = handles.tip_results{iH,iT}.yce;
         crp = handles.tip_results{iH,iT}.crp;
         clp = handles.tip_results{iH,iT}.clp;
