@@ -22,7 +22,7 @@ function varargout = TipTrackerv3(varargin)
 
 % Edit the above text to modify the response to help TipTrackerv3
 
-% Last Modified by GUIDE v2.5 23-Mar-2019 12:57:31
+% Last Modified by GUIDE v2.5 06-May-2019 20:08:55
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -443,7 +443,8 @@ handles.images = struct( ...
     'boundary', [], ...
     'boundary_Din', [], ...
     'boundary_Dout', [], ...
-    'boundary_FM', [], ...
+    'boundary_FMin', [], ...
+    'boundary_FMout', [], ...
     'axial', [], ...
     'radial', [], ...
     'test', [], ...
@@ -785,7 +786,9 @@ handles.options.image_names = { ...
     'tip'; ...
     'boundary'; ...
     'boundary_Din'; ...
-    'boundary_FM'; ...
+    'boundary_Dout'; ...
+    'boundary_FMin'; ...
+    'boundary_FMout'; ...
     'axial'; ...
     'radial'; ...
     'rotated'; ...
@@ -862,6 +865,7 @@ set(handles.pop_tip_spk_channel, 'Value',find(strcmp(get(handles.pop_tip_spk_cha
 % update the segmentation parameters
 set(handles.chk_segment_threshold_auto, 'Value',handles.param.segment_threshold_auto);
 set(handles.pop_segment_method, 'Value',find(strcmp(handles.options.segment_method,handles.param.segment_method)))
+set(handles.chk_segment_auto_filter,'Value',handles.param.segment_auto_filter);
 handles = fnc_segment_parameters_set(handles);
 
 % update the filter parameters
@@ -1066,6 +1070,7 @@ handles.param.local_radius_Bernsen = 20;
 handles.param.local_offset_Bernsen = 0;
 handles.param.local_radius_Sauvola = 20;
 handles.param.local_offset_Sauvola = 0.5;
+handles.param.segment_auto_filter = 0;
 % tip smoothing
 handles.param.filter_noise = 15;
 handles.param.filter_median = 7;
@@ -1697,29 +1702,35 @@ function pop_ch4_std_thresh_Callback(hObject, eventdata, handles)
 handles.param.back_n_std(4) = fnc_sd(4, handles);
 guidata(gcbo, handles);
 
-function fnc_update_back_chk(iC, flag, handles)
-% iC    Channel
-% flag  1 if checked
-if flag == 1
-    handles.param.chk_back(iC) = 1;
-    handles.param.back(iC) = str2double(get(eval(['handles.txt_ch' num2str(iC) '_back']), 'string'));
-end
-guidata(gcbo, handles);
+% function fnc_update_back_chk(iC, flag, handles)
+% % iC    Channel
+% % flag  1 if checked
+% if flag == 1
+%     handles.param.chk_back(iC) = 1;
+%     handles.param.back(iC) = str2double(get(eval(['handles.txt_ch' num2str(iC) '_back']), 'string'));
+% end
+% guidata(gcbo, handles);
 
 function chk_ch1_back_Callback(hObject, eventdata, handles)
-fnc_update_back_chk(1, get(hObject, 'value'), handles)
+handles.param.chk_back(1) = get(hObject, 'Value');
+guidata(gcbo, handles);
+% fnc_update_back_chk(1, get(hObject, 'value'), handles)
 
 function chk_ch2_back_Callback(hObject, eventdata, handles)
-fnc_update_back_chk(2, get(hObject, 'value'), handles)
+handles.param.chk_back(2) = get(hObject, 'Value');
+guidata(gcbo, handles);
 
 function chk_ch3_back_Callback(hObject, eventdata, handles)
-fnc_update_back_chk(3, get(hObject, 'value'), handles)
+handles.param.chk_back(3) = get(hObject, 'Value');
+guidata(gcbo, handles);
 
 function chk_ch4_back_Callback(hObject, eventdata, handles)
-fnc_update_back_chk(4, get(hObject, 'value'), handles)
+handles.param.chk_back(4) = get(hObject, 'Value');
+guidata(gcbo, handles);
 
 function chk_ch5_back_Callback(hObject, eventdata, handles)
-fnc_update_back_chk(5, get(hObject, 'value'), handles)
+handles.param.chk_back(5) = get(hObject, 'Value');
+guidata(gcbo, handles);
 
 function pop_back_method_Callback(hObject, eventdata, handles)
 options = get(handles.pop_back_method, 'String');
@@ -1737,6 +1748,7 @@ set(handles.pop_display_image, 'Value', find(strcmpi(get(handles.pop_display_ima
 handles = fnc_display_image(handles);
     set(handles.segment_controls, 'enable','on')
     handles = fnc_segment_method(handles);
+    guidata(gcbo, handles);
     % clear the axes
     h = findobj(gcf, 'Type','line','color','k','linestyle',':');
     delete(h)
@@ -1812,6 +1824,11 @@ if get(handles.chk_auto_corr, 'value') == 1
 end
 set(handles.stt_status, 'string', 'Setting negative values to zero. Please wait...');drawnow;
 handles.images.subtracted(handles.images.subtracted < 0) = 0;
+% set up a mask image
+for iC = 1:handles.nC
+    set(handles.stt_status, 'string', ['calculating the mask subtraction for channel ' num2str(iC) '. Please wait...']);drawnow;
+    handles.images.mask(1:handles.newnY,1:handles.newnX,iC,1:handles.newnZ,1:handles.newnT) = handles.images.subtracted(1:handles.newnY,1:handles.newnX,iC,1:handles.newnZ,1:handles.newnT)>handles.param.back_std(iC).*2;
+end
 set(handles.stt_status, 'string', 'Finished background subtraction');drawnow;
 
 %--------------------------------------------------------------------------
@@ -2024,6 +2041,11 @@ handles.param.filter_median = str2double(get(hObject, 'String'));
 guidata(gcbo, handles);
 fnc_param_save(handles)
 
+function chk_segment_auto_filter_Callback(hObject, eventdata, handles)
+handles.param.tip_auto_select = str2double(get(hObject, 'String'));
+guidata(gcbo, handles);
+fnc_param_save(handles)
+
 function btn_segment_Callback(hObject, eventdata, handles)
 set(handles.stt_status,'string', 'Segmenting images. Please wait...');drawnow;
 handles = fnc_segment(handles);
@@ -2057,7 +2079,8 @@ for iT = 1:handles.nT
     switch handles.param.segment_method
         case 'global'
             if get(handles.chk_segment_threshold_auto, 'Value')
-                handles.expt.global_threshold(iT) = graythresh(im);
+                thresh = multithresh(im,2);
+                handles.expt.global_threshold(iT) = thresh(1);
                 set(handles.sld_segment_threshold, 'Value',handles.expt.global_threshold(iT))
                 set(handles.txt_segment_threshold, 'String',handles.expt.global_threshold(iT))
                 bw = imbinarize(im,handles.expt.global_threshold(iT));
@@ -2108,14 +2131,18 @@ for iT = 1:handles.nT
             level = m .* (1.0 + handles.param.local_offset * (s / R - 1.0));
             bw = im > level;
     end
+    bw = bw & handles.images.mask(:,:,iC,iZ,iT);
+    if get(handles.chk_segment_auto_filter,'Value')
     % remove noise below the radius of se1
     filt = imopen(bw,noise_se);
     % reconstruct the original image without the noise
     bw = imreconstruct(filt,bw);
+    end
     % apply a strong median filter to tidy up the boundary
     bw = medfilt2(bw,[median_size median_size]);
     % remove single pixel dents or bumps
     bw =  bwmorph(bw,'majority') | ~bwmorph(~bw,'majority');
+%     bw = imfill(bw,'holes');
     if iT > 1
         % apply the separator skeleton from previous time-points. This
         % helps to ensure the watershed will be able to separate tips that
@@ -2151,6 +2178,7 @@ end
 
 function btn_select_Callback(hObject, eventdata, handles)
 set(handles.stt_status,'string', 'Selection of hyphal tips for analysis');drawnow;
+set(handles.sld_T,'Value',1);
 % reset the tip table
 set(handles.uit_tip,'data',{0,0,0,false})
 % clear the results array
@@ -2231,8 +2259,9 @@ handles.images.midline = false(size(handles.images.segmented)); % midline of seg
 handles.images.tip = zeros(size(handles.images.segmented)); % tip region of segmented hypha
 handles.images.boundary = zeros(size(handles.images.segmented)); % single pixel wide boundary
 handles.images.boundary_Din = zeros(size(handles.images.segmented)); % internal distance from boundary
-handles.images.boundary_Dout = zeros(size(handles.images.segmented)); % external distance from boundary
-handles.images.boundary_FM = zeros(size(handles.images.segmented)); % feature map from bundary
+handles.images.boundary_FMin = zeros(size(handles.images.segmented)); % feature map internal from boundary
+% handles.images.boundary_Dout = zeros(size(handles.images.segmented)); % external distance from boundary
+% handles.images.boundary_FMout = zeros(size(handles.images.segmented)); % feature map external from boundary
 % get the circumferential trace distance
 handles.param.trace_distance = str2double(get(handles.txt_tip_trace_distance, 'String'));
 % % convert the distance to microns
@@ -2267,7 +2296,7 @@ for iT = 1:handles.nT
     set(handles.txt_T,'String',iT)
     handles = fnc_display_image(handles);
     % get a bw image of all the hyphae at this time point, ensuring the
-    % boundarys prevent 8 connectivity
+    % boundaries prevent 8 connectivity
     hypha_all = handles.images.segmented(:,:,iC,iZ,iT);
     % calculate the geodesic distance transform from the selected points
     DGeo = bwdistgeodesic(hypha_all,x,y,'quasi-euclidean');
@@ -2307,6 +2336,7 @@ for iT = 1:handles.nT
     % set up an extended colormap to label each hypha
     cols = repmat({'r','g','b','c','m','y','w'},1,10);
     % loop through each hyphae
+    tip_labelled = zeros(size(tip_ID));
     for iH = 1:length(v)
         % display the selected points
         plot(handles.ax_image,x(iH),y(iH),'Marker','o','MarkerFaceColor',cols{iH},'MarkerEdgeColor','k','MarkerSize',3)
@@ -2320,10 +2350,13 @@ for iT = 1:handles.nT
             % new skeleton endpoints that have just been extracted
             DGeo = bwdistgeodesic(tip,x(iH),y(iH),'quasi-euclidean');
             tip = DGeo<distance;
+            % get the maximum radius for the hypha in the tip region
+            rmax = double(round(max(D(tip))));
             % get the complete hyphae that includes this tip
             hypha = bwselect(hypha_all,x(iH),y(iH));
             % find the boundary points on the surface of the hypha as the
             % intersection between the tip boundary and the hyphal boundary
+            % to exclude the points truncating the tip region
             tip_boundary = bwboundaries(tip);
             hypha_boundary = bwboundaries(hypha);
             boundary = intersect(tip_boundary{1}(:,1:2),hypha_boundary{1}(:,1:2),'rows','stable');
@@ -2341,6 +2374,7 @@ for iT = 1:handles.nT
             B_length = cumsum([0; hypot(diff(boundary(:,1)),diff(boundary(:,2)))]);
             % set the new tip image to the label value of the current hypha
             tip_ID(tip) = iH;
+            tip_labelled(tip) = iH;
             h = plot(handles.ax_image,boundary(:,2), boundary(:,1), 'c:', 'LineWidth', 0.75);
             set(h, 'Tag','tip_boundary')
             % update the results
@@ -2352,15 +2386,18 @@ for iT = 1:handles.nT
     end
     % update the images
     handles.images.midline(:,:,iC,iZ,iT) = bw_midline;
-    handles.images.tip(:,:,iC,iZ,iT) = tip_ID;
+    handles.images.tip(:,:,iC,iZ,iT) = tip_labelled;
+    handles.images.tip_ID(:,:,iC,iZ,iT) = tip_ID;
     handles.images.boundary(:,:,iC,iZ,iT) = boundary_im;
     % calculate the internal distance transform and feature map for all tips, with
     % masking by the tip image
-     mask = double(tip_ID>0) ;
-    [DB,FMB] = bwdist(boundary_im,'Euclidean');
+    mask = double(tip_ID>0) ;
+    boundary_all = bwperim(hypha_all);
+    [DB,FMB] = bwdist(boundary_all,'Euclidean');
     handles.images.boundary_Din(:,:,iC,iZ,iT) = DB.*mask;
-    handles.images.boundary_Dout(:,:,iC,iZ,iT) = DB.*~mask;
-    handles.images.boundary_FM(:,:,iC,iZ,iT)  = double(FMB).*mask;
+    handles.images.boundary_FMin(:,:,iC,iZ,iT)  = double(FMB).*mask;
+%     handles.images.boundary_Dout(:,:,iC,iZ,iT) = DB.*~hyph_all;
+%     handles.images.boundary_FMout(:,:,iC,iZ,iT)  = double(FMB);
 end
 % set the active status of points that are less than the trace distance away from
 % the boundary of the image to zero
@@ -2368,8 +2405,8 @@ handles.tip_table.active = handles.tip_table.endpoint(:,1)>rmax & handles.tip_ta
 handles.images.selected = max(handles.images.tip, [], 5);
 % update the tip table
 ID = 1:nH;
-[~,first] = max(tip_log);
-last = sum(tip_log)+first-1;
+[~,first] = max(tip_log,[],1);
+last = sum(tip_log,1)+first-1;
 use = true(nH,1);
 set(handles.uit_tip, 'data',[num2cell([ID',first',last']),num2cell(use)])
 handles.TipIdx = true(nH,1);
@@ -2428,7 +2465,7 @@ for iH = 1:length(idxA)
     % get the co-ordinates of the boundary in the tip region
     boundary = handles.tip_table.boundary{idxA(iH)};
     % use an approximate 60 degree separation for the test points of the osculating circle
-    dc = round(rmax.*0.75); 
+    dc = round(rmax); 
     % set up the output arrays
     R = ones(size(boundary,1),1)*inf; % radius
     K = zeros(size(boundary,1),1); % curvature
@@ -2503,7 +2540,7 @@ for iH = 1:length(idxA)
     end
 end
 for iH = 1:length(idxA)
-    idx = handles.tip_table.ID(idxA(iH))
+    idx = handles.tip_table.ID(idxA(iH));
 end
 set(handles.stt_status,'string', 'Tip tracing finished');drawnow;
 
@@ -2596,7 +2633,7 @@ for iT = 1:handles.nT
             mask = handles.images.boundary_Din(:,:,1,1,iT)<=p_erode;
             % apply the mask to the Feature Map to extract the nearest pixel index on the
             % boundary for each pixel to be aggregated
-            FM = handles.images.boundary_FM(:,:,1,1,iT);
+            FM = handles.images.boundary_FMin(:,:,1,1,iT);
             FMidx = FM(mask);
             % keep the non-zero values as a vector
             idx = FMidx==0;
@@ -2707,13 +2744,11 @@ for iT = 1:handles.nT
     end
 end
 
-
 function btn_tip_profile_analyse_Callback(hObject, eventdata, handles)
 handles = fnc_tip_profile_analyse(handles);
 guidata(gcbo, handles);
 set(handles.stt_status,'string', ['Profiles complete']);drawnow;
 fnc_tip_plot_profile(handles.ax_image,handles);
-
 
 function handles = fnc_tip_profile_analyse(handles)
 assignin('base','table',handles.tip_table)
@@ -3048,11 +3083,20 @@ else
     fnc_tip_plot_erase(handles.ax_image,'tip_spk',handles)
 end
 
+function chk_tip_plot_ID_Callback(hObject, eventdata, handles)
+if get(hObject, 'Value')
+    fnc_tip_plot(handles.ax_image,handles)
+else
+    fnc_tip_plot_erase(handles.ax_image,'tip_ID',handles)
+end
+
 function fnc_tip_plot_erase(ax,target,handles)
 switch target
     case 'all'
         h = findobj(ax,'type','line','tag','tip_*');
         delete(h);
+        h = findobj(ax,'type','text','tag','tip_*');
+        delete(h);        
         h = findobj(ax,'type','quiver','tag','tip_*');
         delete(h);
                 h = findobj(ax,'type','scatter','tag','tip_*');
@@ -3060,6 +3104,8 @@ switch target
     otherwise
         h = findobj(ax,'type','line','tag',target);
         delete(h);
+        h = findobj(ax,'type','text','tag',target);
+        delete(h);        
         h = findobj(ax,'type','quiver','tag',target);
         delete(h);
                 h = findobj(ax,'type','scatter','tag',target);
@@ -3097,6 +3143,16 @@ if iT < handles.nT
     idx2 = find(handles.tip_table.T == iT+1 & handles.tip_table.Z == iZ & handles.tip_table.C == iC & handles.tip_table.active == 1);
 else
     idx2 = [];
+end
+% plot the tip ID
+if get(handles.chk_tip_plot_ID, 'value')
+    for k = 1:nH
+        x = (double(handles.tip_table.boundary{k}(1,2) + double(handles.tip_table.boundary{k}(end,2)))./2);
+        y = (double(handles.tip_table.boundary{k}(1,1) + double(handles.tip_table.boundary{k}(end,1)))./2);
+        text(ax,x,y,num2str(handles.tip_table.ID(k)), ...
+            'Color','r','HorizontalAlignment','center','VerticalAlignment','middle', ...
+            'Tag','tip_ID');
+    end
 end
 % plot the osculating circle
 if get(handles.chk_tip_plot_OCC, 'value')
@@ -3222,7 +3278,7 @@ if get(handles.chk_tip_plot_OCC_peak_vector, 'value')
         -Vx1*OCC_vector_size,-Vy1*OCC_vector_size,'m','AutoScale','off');
      set(h, 'MaxHeadSize',max_head_size)
     set(h, 'Tag','tip_OCC_peak_vector');
-    h = plot(ax,xc,yc, ...
+    h = plot(ax,data1(:,2),data1(:,1), ...
         'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','m');
     set(h, 'Tag','tip_OCC_peak_vector')
 end
@@ -3290,7 +3346,7 @@ if get(handles.chk_tip_plot_profile, 'Value')
              set(h, 'Tag','tip_profile');
              h = plot(ax,x(offset+P_length+1),y(offset+P_length+1),'r*');
              set(h, 'Tag','tip_profile');
-             h = plot(ax,x(offset+P_length+2:end),y(offset+P_length+2:end),'b:');
+             h = plot(ax,x(P_length+2:end-offset),y(P_length+2:end-offset),'b:');
              set(h, 'Tag','tip_profile');
             hold on
 %         xce = handles.tip_table{iH,iT}.xce;
@@ -3673,7 +3729,7 @@ end
 rgb_channels = [get(handles.chk_display_R, 'Value') get(handles.chk_display_G, 'Value') get(handles.chk_display_B, 'Value')];
 % get the main image
 switch target
-    case {'raw';'initial'};%;'filtered';'subtracted'}
+    case {'raw';'initial';'filtered';'subtracted'}
         sz = size(handles.images.(target));
         if length(sz) > 2
             if sz(3) == 1
@@ -3696,12 +3752,12 @@ switch target
             im_out = zeros(sz(1),sz(2),1,'like',handles.images.(target));
             im_out(:,:,1) = single(squeeze(handles.images.(target)(:,:,iC,iZ,iT).*rgb_channels(iC)));
         end
-            case 'selected'
+    case 'selected'
         mx = max(handles.images.(target)(:));
         cmap(1,:) = 0;
         % normalise to the maximum and convert to RGB
         im_out(:,:,:,1) = ind2rgb(uint8(255.*handles.images.(target)./mx),cmap);
-    case {'tip';'boundary';'boundary_Din';'boundary_FM';'axial';'radial'}
+    case {'tip';'boundary';'boundary_Din';'boundary_Dout';'boundary_FMin';'boundary_FMout';'axial';'radial'}
         temp = handles.images.(target)(:,:,iC,iZ,iT);
         idx = ~isinf(temp(:));
         mx = max(temp(idx));
@@ -3765,7 +3821,7 @@ switch merge
         cmap(1,:) = 0;
         % normalise to the maximum and convert to RGB
         merge_out(:,:,:,1) = ind2rgb(uint8(255.*handles.images.(merge)./mx),cmap);
-    case {'tip';'boundary';'boundary_Din';'boundary_FM';'axial';'radial'}
+    case {'tip';'boundary';'boundary_Din';'boundary_Dout';'boundary_FMin';'boundary_FMout';'axial';'radial'}
         temp = handles.images.(merge)(:,:,iC,iZ,iT);
         idx = ~isinf(temp(:));
         mx = max(temp(idx));
@@ -3778,7 +3834,22 @@ switch merge
     case 'black'
         merge_out = zeros(size(handles.images.filtered,1),size(handles.images.filtered,2),'like',handles.images.filtered);
     otherwise
-        merge_out = handles.images.(merge)(:,:,iC,iZ,iT);
+        sz = size(handles.images.(merge));
+        if get(handles.chk_T_max, 'value') == 1
+            if ndims(handles.images.(merge)) == 5
+                merge_out = max(handles.images.(merge)(:,:,min(sz(3),iC),min(sz(4),iZ),1:handles.T_inc:sz(5)), [],5);
+            else
+                merge_out = handles.images.(merge);
+            end
+        else
+            if ndims(handles.images.(merge)) == 5
+                merge_out = handles.images.(merge)(:,:,min(sz(3),iC),min(sz(4),iZ),min(sz(5),iT));
+            else
+                merge_out = handles.images.(merge);
+            end
+        end
+        if get(handles.chk_Z_max, 'value') == 1
+        end
 end
 switch merge
     case 'none'
