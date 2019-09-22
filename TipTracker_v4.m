@@ -1328,7 +1328,7 @@ for iC = 1:3
 end
 % get the profile
 axes(handles.ax_image)
-[~, ~, lv] = improfile;
+[~, ~, lv] = improfile('bilinear');
 % compress the values to a n x 1-3 array
 lv = squeeze(lv).*scaling;
 nC = size(lv,2);
@@ -2391,13 +2391,14 @@ for iT = 1:handles.nT
     % distance
     tip_all = (DGeo<distance.*1.5);
     if iT ==1
-        % label the first image to give tips a unique ID
+        % label the first image to give tips a unique ID. All the selected
+        % tips should be present in this image.
         tip_ID = bwlabel(tip_all);
     else
         % get the previous tip ID image
         previous = handles.images.tip_ID(:,:,iC,iZ,iT-1);
         % get the previous as the input to select the new tip regions
-        for iH = 1:max(previous(:))
+        for iH = 1:nH;%max(previous(:))
             [r,c] = find(previous==iH);
             temp = bwselect(tip_all,c,r);
             % set the new tip to the existing ID
@@ -2407,7 +2408,7 @@ for iT = 1:handles.nT
         end
     end
     % calculate the distance transform
-    [D,FM] = bwdist(~hypha_all, 'Euclidean'); % D is the euclidean distance, FM is the feature map
+    D = bwdist(~hypha_all, 'Euclidean'); % D is the euclidean distance, FM is the feature map
     if iT == 1
         % get the maximum radius present from the distance transform of just the
         % tip regions to ensure no other objects dominate the estimate
@@ -2445,19 +2446,18 @@ for iT = 1:handles.nT
     tip_labelled = zeros(size(tip_ID));
     tip_midline = zeros(size(tip_ID));
     for iH = 1:length(v)
+                        % update the tip log
+            tip_log(iT,v(iH)) = 1;
         % display the selected points
         plot(handles.ax_image,x(iH),y(iH),'Marker','o','MarkerFaceColor',cols{iH},'MarkerEdgeColor','k','MarkerSize',3)
         % get the specific hypha
         tip = bwselect(tip_all,x(iH),y(iH));
-        % check that there is tip present (should be unnecessary?)
-        if any(tip(:))
-            % update the tip log
-            tip_log(iT,v(iH)) = 1;
+if any(tip(:))
             % select just the region within the trace distance from the
             % new skeleton endpoints that have just been extracted
             DGeo = bwdistgeodesic(tip,x(iH),y(iH),'quasi-euclidean');
             tip = DGeo<distance;
-            % get the maximum radius for the hypha in the tip region
+            % get the maximum radius for this hypha in the tip region
             rmax = double(round(max(D(tip))));
             % get the complete hyphae that includes this tip
             hypha = bwselect(hypha_all,x(iH),y(iH));
@@ -2476,7 +2476,7 @@ for iT = 1:handles.nT
             boundary = circshift(boundary(1:end-1,:),-idx,1);
             % create a boundary image with the tip ID
             B_idx = sub2ind(size(tip),round(boundary(:,1)),round(boundary(:,2)));
-            boundary_im(B_idx) = iH;
+            boundary_im(B_idx) = v(iH);
             % get the midline for the hypha as an image
             midline_im = bw_midline & hypha;
             midline = bwtraceboundary(midline_im,double([y(iH),x(iH)]),'N');
@@ -2485,18 +2485,20 @@ for iT = 1:handles.nT
             midline(round(length(midline)/2):end,:) = [];
             % get the 
             % set the new tip image to the label value of the current hypha
-            tip_ID(tip) = iH;
-            tip_labelled(tip) = iH;
-            tip_midline(midline_im) = iH;
+            tip_ID(tip) = v(iH);
+            tip_labelled(tip) = v(iH);
+            tip_midline(midline_im) = v(iH);
             h = plot(handles.ax_image,boundary(:,2), boundary(:,1), 'c:', 'LineWidth', 0.75);
             set(h, 'Tag','tip_boundary')
             h = plot(handles.ax_image,midline(:,2), midline(:,1), 'y-', 'LineWidth', 0.75);
             set(h, 'Tag','tip_midline')
             % update the results
-            T = table({handles.fname},iT,iZ,iC,iH,1,[y(iH),x(iH)],{boundary},{B_idx},{midline},rmax,'VariableNames',{'filename','T','Z','C','ID','active','endpoint','boundary','B_idx','midline','rmax'});
+            T = table({handles.fname},iT,iZ,iC,v(iH),1,[y(iH),x(iH)],{boundary},{B_idx},{midline},rmax,'VariableNames',{'filename','T','Z','C','ID','active','endpoint','boundary','B_idx','midline','rmax'});
             handles.tip_table = [handles.tip_table; T];
         else
-            'no tip'
+            tip_log(iT,v(iH)) = 0;
+%             T = table({handles.fname},iT,iZ,iC,iH,1,[nan,nan],{nan},{nan},{nan},nan,'VariableNames',{'filename','T','Z','C','ID','active','endpoint','boundary','B_idx','midline','rmax'});
+%             handles.tip_table = [handles.tip_table; T];
         end
     end
     % update the images
@@ -2553,21 +2555,24 @@ fnc_param_save(handles)
 function btn_tip_profile_Callback(hObject, eventdata, handles)
 handles = fnc_boundary_profile(handles);
 guidata(gcbo, handles);
-set(handles.stt_status,'string', ['Profiles complete']);drawnow;
+set(handles.stt_status,'string', ['Boundary profiles complete']);drawnow;
 fnc_tip_plot_profile(handles.ax_image,handles);
+assignin('base','tip_table',handles.tip_table)
+
 
 function handles = fnc_boundary_profile(handles)
 p_average = str2double(get(handles.txt_tip_profile_average, 'String'));
 % loop through each time-point
 for iT = 1:max(handles.tip_table.T)
         set(handles.stt_status,'string', ['Calculating boundary profiles for frame : ' num2str(iT) '. Please wait...']);drawnow;
-
     % get the subtracted image for each time point
     im = mat2gray(handles.images.subtracted(:,:,1,1,iT));
     % loop through each hypha
     for iH = 1:max(handles.tip_table.ID)
         % get the index into the tip_table array
         iD = find(handles.tip_table.T == iT & handles.tip_table.ID == iH);
+        % check the tip is active
+        if ~isempty(iD) && handles.tip_table.active(iD)
         % get a smoothed boundary for the tip
         SB = smoothdata(handles.tip_table.boundary{iD},'sgolay',15);
         % measure the euclidean length along the boundary
@@ -2601,7 +2606,7 @@ for iT = 1:max(handles.tip_table.T)
         P_mean = zeros(length(xep1),1);
         P_max = zeros(length(xep1),1);
         for iP = 1:length(xep1)
-            P = improfile(im,[xep1(iP) xep2(iP)],[yep1(iP) yep2(iP)],2*p_average+1);
+            P = improfile(im,[xep1(iP) xep2(iP)],[yep1(iP) yep2(iP)],2*p_average+1,'bilinear');
             P = smoothdata(P,'sgolay',5);
             P_mean(iP,1) = mean(P);
             P_max(iP,1) = max(P);
@@ -2614,6 +2619,16 @@ for iT = 1:max(handles.tip_table.T)
 %         plot(x,y,'b.')
 %         plot(xep1,yep1,'r.')
 %         plot(xep2,yep2,'g.')
+%         else
+%             assignin('base','tip_table',handles.tip_table)
+%             a = handles.tip_table.P{iD}
+%         handles.tip_table.P{iD} = [;
+%         handles.tip_table.P_length{iD} = [nan];
+%         handles.tip_table.P_outer{iD} = [nan nan];
+%         handles.tip_table.P_inner{iD} = [nan nan]; 
+%                 handles.tip_table.P_mean{iD} = nan;
+%         handles.tip_table.P_max{iD} = nan;
+        end
     end
 end
 
@@ -2628,6 +2643,7 @@ set(handles.stt_status,'string', ['Profile analysis complete']);drawnow;
 fnc_tip_plot_profile(handles.ax_image,handles);
 
 function handles = fnc_tip_profile_analyse(handles)
+assignin('base','tip_table',handles.tip_table)
 peak_reset = contains(handles.tip_table.Properties.VariableNames,'peak');
 handles.tip_table(:,peak_reset) = [];
 [handles.tip_table.peak_height, ...
@@ -2755,8 +2771,8 @@ set(handles.stt_status,'string', 'Tip tracing finished');drawnow;
 % TIP CO-ORDINATE SYSTEMS
 % --------------------------------------------------------------------------
 
-handles = fnc_tip_coordinate_system(handles);
-guidata(gcbo, handles);
+% handles = fnc_tip_coordinate_system(handles);
+% guidata(gcbo, handles);
 
 % --------------------------------------------------------------------------
 % AXIAL PROFILE
@@ -2775,7 +2791,7 @@ nH = max(handles.tip_table.ID);
 nT = max(handles.tip_table.T);
 handles.images.axial = zeros(100,round(rmax120*nH),1,1,nT);
 % loop through each time-point
-for iT = 1;%:nT
+for iT = 1:nT
     set(handles.stt_status,'string', ['Calculating axial profiles for frame : ' num2str(iT) '. Please wait...']);drawnow;
     % get the subtracted image for each time point
     im = mat2gray(handles.images.subtracted(:,:,1,1,iT));
@@ -2783,8 +2799,10 @@ for iT = 1;%:nT
     for iH = 1:nH
         % get the index into the tip_table array
         iD = find(handles.tip_table.T == iT & handles.tip_table.ID == iH);
+        % check whether the tip is active
+        if handles.tip_table.active(iD)
         % get a smoothed midline (SM) profile
-        SM = smoothdata(handles.tip_table.midline{iD},'sgolay',15)
+        SM = smoothdata(handles.tip_table.midline{iD},'sgolay',15);
         % add in the tip apex and outer marker
         SM = [handles.tip_table.OC_apex(iD,:); SM];
         % measure the euclidean length along the boundary
@@ -2808,55 +2826,20 @@ for iT = 1;%:nT
         xep2(idxnan) = [];
         yep1(idxnan) = [];
         yep2(idxnan) = [];
-%         % update the tip_table with the sets of profile co-ordinates
-%         handles.tip_table.P{iD} = [y(~idxnan),x(~idxnan)];
-%         handles.tip_table.P_length{iD} = SB_length_interp(~idxnan);
-%         handles.tip_table.P_outer{iD} = [yep1 xep1];
-%         handles.tip_table.P_inner{iD} = [yep2 xep2];  
-axes(handles.ax_image)
-hold on
-plot(x,y,'b.')
-plot(xep1,yep1,'r.')
-plot(xep2,yep2,'g.')
+%         axes(handles.ax_image)
+%         hold on
+%         plot(x,y,'b.')
+%         plot(xep1,yep1,'r.')
+%         plot(xep2,yep2,'g.')
         % calculate the profile along each pair of endpoint co-ordinates,
         for iP = 1:length(min(50,xep1))
-            P = improfile(im,[xep1(iP) xep2(iP)],[yep1(iP) yep2(iP)],width);
+            P = improfile(im,[xep1(iP) xep2(iP)],[yep1(iP) yep2(iP)],width, 'bilinear');
             handles.images.axial(iP,(1:width)+((iH-1)*width),1,1,iT) = P';
+        end
         end
     end
 end
 handles.images.test = handles.images.axial;
-
-
-function handles = fnc_tip_coordinate_system(handles)
-handles.images.axial = zeros(size(handles.images.subtracted));
-handles.images.radial = zeros(size(handles.images.subtracted));
-for iT = 1:handles.nT
-    set(handles.stt_status, 'String',['Calculating co-ordinate system for image ' num2str(iT) '.Please wait...'])
-    % create a geodesic distance transform image from each apex,
-    % constrained by the hyphal boundary, to get the axial co-ordinates
-    temp = false(size(handles.images.subtracted,1),size(handles.images.subtracted,2));
-    apex = handles.tip_table.OC_apex(handles.tip_table.T == iT,:);
-    % check whether tips are active
-    active = handles.tip_table.active(handles.tip_table.T == iT,:);
-    idx = sub2ind(size(temp),round(apex(active,1)),round(apex(active,2)));
-    temp(idx) = 1;
-    handles.images.axial(:,:,1,1,iT) = bwdistgeodesic(handles.images.segmented(:,:,1,1,iT),temp,'quasi-euclidean');
-    % create a complete midline to the apex
-    midline = handles.images.midline(:,:,1,1,iT);
-    endpoints = handles.tip_table.endpoint(handles.tip_table.T == iT,:);
-    for iB = 1:size(apex,1)
-        if active(iB)
-            [r,c] = bresenham(apex(iB,1),apex(iB,2),endpoints(iB,1),endpoints(iB,2));
-            idx = sub2ind(size(midline),r,c);
-            midline(idx) = 1;
-        end
-    end
-    % Create the geodesic distance transform from the extended midline, constrained by the hyphal boundary, to
-    % get the radial co-ordinates
-    handles.images.radial(:,:,1,1,iT) = bwdistgeodesic(handles.images.segmented(:,:,1,1,iT),midline,'quasi-euclidean');
-end
-set(handles.stt_status, 'String','Co-ordinate system complete')
 
 % -------------------------------------------------------------------------
 % SPITZENKORPER DETECTOR
@@ -2906,20 +2889,7 @@ switch method
                 im = mat2gray(im);
                 % get the row index into the main results table
                 r = handles.tip_table.T == iT & handles.tip_table.ID == iH;
-                if ~isempty(r) && handles.tip_table.active(r) == 1 && ~isempty(handles.tip_table.OC_apex(r))
-                    %                 if handles.TipIdx(iH) && size(handles.tip_results,2) >=iT && ~isempty(handles.tip_results{iH,iT}) && isfield(handles.tip_results{iH,iT}, 'cm')
-                    
-                    %     % only use the region within the osculating circle
-                    %     center = handles.tip_results{iH,iT}.center;
-                    %     radius = handles.tip_results{iH,iT}.radius;
-                    %     % calculate the osculating circle
-                    %     theta = linspace(0,2*pi,60);
-                    %     rho = ones(1,60)*radius;
-                    %     [xr,yr] = pol2cart(theta,rho);
-                    %     xr = xr + center(2);
-                    %     yr = yr + center(1);
-                    %     mask = poly2mask(xr,yr,size(im,1),size(im,2));
-                    %
+                if ~isempty(r) & handles.tip_table.active(r)==1 & ~isempty(handles.tip_table.OC_apex(r))
                     % only use the region in the selected tip
                     % find centers within the tip
                     tip = handles.images.tip(:,:,1,1,iT)==iH;
@@ -2942,10 +2912,6 @@ switch method
                     d = dist(sub2ind(size(im),ridx,cidx));
                     % get the intensity value of each point
                     v = im(sub2ind(size(im),ridx,cidx));
-                    %                     points = [d v ridx cidx];
-                    %                     points = sortrows(points,1);
-%                                         % pick the point that is closest to the apex
-%                                         [~,idx] = min(d);
                     % in case there are multiple points nearby, find the
                     % brightest point within some distance
                     mx = max(v(d <= min(d)*2));
@@ -3237,51 +3203,56 @@ if get(handles.chk_tip_plot_spk, 'value') && any(ismember(handles.tip_table.Prop
     set(h, 'Tag','tip_spk')
 end
 % plot the delta T vectors
-if get(handles.chk_tip_plot_apex_apex_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.OC_apex(idx))
-    Vx1 = handles.tip_table.OC_apex(idx2,2)-handles.tip_table.OC_apex(idx,2);
-    Vy1 = handles.tip_table.OC_apex(idx2,1)-handles.tip_table.OC_apex(idx,1);
-    h = quiver(ax,handles.tip_table.OC_apex(idx,2),handles.tip_table.OC_apex(idx,1), ...
+if get(handles.chk_tip_plot_apex_apex_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.OC_apex(idx)) && ~isempty(handles.tip_table.OC_apex(idx2))
+    [~,ia,ib] = intersect(handles.tip_table.ID(idx), handles.tip_table.ID(idx2));
+    Vx1 = handles.tip_table.OC_apex(idx2(ib),2)-handles.tip_table.OC_apex(idx(ia),2);
+    Vy1 = handles.tip_table.OC_apex(idx2(ib),1)-handles.tip_table.OC_apex(idx(ia),1);
+    h = quiver(ax,handles.tip_table.OC_apex(idx(ia),2),handles.tip_table.OC_apex(idx(ia),1), ...
         Vx1*vector_size,Vy1*vector_size,'g','AutoScale','off');
     set(h, 'MaxHeadSize',max_head_size)
     set(h, 'Tag','tip_apex_apex_vector');
-    h = plot(ax,handles.tip_table.OC_apex(idx,2),handles.tip_table.OC_apex(idx,1), ...
+    h = plot(ax,handles.tip_table.OC_apex(idx(ia),2),handles.tip_table.OC_apex(idx(ia),1), ...
         'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','g');
     set(h, 'Tag','tip_apex_apex_vector')
 end
-if get(handles.chk_tip_plot_OCC_OCC_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.OC_center(idx))
-    Vx1 = handles.tip_table.OC_center(idx2,2)-handles.tip_table.OC_center(idx,2);
-    Vy1 = handles.tip_table.OC_center(idx2,1)-handles.tip_table.OC_center(idx,1);
-    h = quiver(ax,handles.tip_table.OC_center(idx,2),handles.tip_table.OC_center(idx,1), ...
+if get(handles.chk_tip_plot_OCC_OCC_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.OC_center(idx)) && ~isempty(handles.tip_table.OC_center(idx2))
+        [~,ia,ib] = intersect(handles.tip_table.ID(idx), handles.tip_table.ID(idx2));
+    Vx1 = handles.tip_table.OC_center(idx2(ib),2)-handles.tip_table.OC_center(idx(ia),2);
+    Vy1 = handles.tip_table.OC_center(idx2(ib),1)-handles.tip_table.OC_center(idx(ia),1);
+    h = quiver(ax,handles.tip_table.OC_center(idx(ia),2),handles.tip_table.OC_center(idx(ia),1), ...
         Vx1*vector_size,Vy1*vector_size,'b','AutoScale','off');
     set(h, 'MaxHeadSize',max_head_size)
     set(h, 'Tag','tip_OCC_OCC_vector');
-    h = plot(ax,handles.tip_table.OC_center(idx,2),handles.tip_table.OC_center(idx,1), ...
+    h = plot(ax,handles.tip_table.OC_center(idx(ia),2),handles.tip_table.OC_center(idx(ia),1), ...
         'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','b');
     set(h, 'Tag','tip_OCC_OCC_vector')
 end
-if get(handles.chk_tip_plot_peak_peak_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.peak_coordinates(idx))
+if get(handles.chk_tip_plot_peak_peak_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.peak_coordinates(idx)) && ~isempty(handles.tip_table.peak_coordinates(idx2))
     peak1 = cellfun(@(x,y) x(y,:), handles.tip_table.peak_coordinates(idx), handles.tip_table.peak_main(idx),'UniformOutput',false);
     peak1 = cat(1,peak1{:});
-        peak2 = cellfun(@(x,y) x(y,:), handles.tip_table.peak_coordinates(idx2), handles.tip_table.peak_main(idx2),'UniformOutput',false);
+    peak2 = cellfun(@(x,y) x(y,:), handles.tip_table.peak_coordinates(idx2), handles.tip_table.peak_main(idx2),'UniformOutput',false);
     peak2 = cat(1,peak2{:});
-    Vx1 = peak2(:,2)-peak1(:,2);
-    Vy1 = peak2(:,1)-peak1(:,1);
-    h = quiver(ax,peak1(:,2),peak1(:,1), ...
+            [~,ia,ib] = intersect(handles.tip_table.ID(idx), handles.tip_table.ID(idx2));
+
+    Vx1 = peak2(ib,2)-peak1(ia,2);
+    Vy1 = peak2(ib,1)-peak1(ia,1);
+    h = quiver(ax,peak1(ia,2),peak1(ia,1), ...
         Vx1*vector_size,Vy1*vector_size,'m','AutoScale','off');
     set(h, 'MaxHeadSize',max_head_size)
     set(h, 'Tag','tip_peak_peak_vector');
-    h = plot(ax,peak1(:,2),peak1(:,1), ...
+    h = plot(ax,peak1(ia,2),peak1(ia,1), ...
         'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','m');
     set(h, 'Tag','tip_peak_peak_vector')
 end
 if get(handles.chk_tip_plot_spk_spk_vector, 'value') && ~isempty(idx2) && ~isempty(handles.tip_table.spk(idx))
-    Vx1 = handles.tip_table.spk(idx2,2)-handles.tip_table.spk(idx,2);
-    Vy1 = handles.tip_table.spk(idx2,1)-handles.tip_table.spk(idx,1);
-    h = quiver(ax,handles.tip_table.spk(idx,2),handles.tip_table.spk(idx,1), ...
+    [~,ia,ib] = intersect(handles.tip_table.ID(idx), handles.tip_table.ID(idx2));
+    Vx1 = handles.tip_table.spk(idx2(ib),2)-handles.tip_table.spk(idx(ia),2);
+    Vy1 = handles.tip_table.spk(idx2(ib),1)-handles.tip_table.spk(idx(ia),1);
+    h = quiver(ax,handles.tip_table.spk(idx(ia),2),handles.tip_table.spk(idx(ia),1), ...
         Vx1*vector_size,Vy1*vector_size,'c','AutoScale','off');
     set(h, 'MaxHeadSize',max_head_size)
     set(h, 'Tag','tip_spk_spk_vector');
-    h = plot(ax,handles.tip_table.spk(idx,2),handles.tip_table.spk(idx,1), ...
+    h = plot(ax,handles.tip_table.spk(idx(ia),2),handles.tip_table.spk(idx(ia),1), ...
         'LineStyle','none','Marker','o','MarkerSize',marker_size,'MarkerEdgeColor','k','MarkerFaceColor','c');
     set(h, 'Tag','tip_spk_spk_vector')
 end
