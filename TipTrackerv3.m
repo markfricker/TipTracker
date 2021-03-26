@@ -22,7 +22,7 @@ function varargout = TipTrackerv3(varargin)
 
 % Edit the above text to modify the response to help TipTrackerv3
 
-% Last Modified by GUIDE v2.5 21-Sep-2019 21:42:27
+% Last Modified by GUIDE v2.5 08-Mar-2021 20:25:23
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -1285,7 +1285,7 @@ resume(hl)
 dist = inputdlg('calibration length (mm)');
 delete(hl);
 handles.expt.micron_per_pixel = 1000.*str2double(dist{1})/sqrt((pos(1,1)-pos(2,1))^2 + (pos(1,2)-pos(2,2))^2);
-set(handles.stt_status, 'string',['The calibration is ' num2str(handles.expt.micron_per_pixel, '%4.2f') ' µm per pixel']);
+set(handles.stt_status, 'string',['The calibration is ' num2str(handles.expt.micron_per_pixel, '%4.2f') ' Âµm per pixel']);
 set(handles.txt_micron_per_pix, 'string', num2str(handles.expt.micron_per_pixel, '%4.2f'));
 
 function txt_profile_FWHM_min1_Callback(hObject, eventdata, handles)
@@ -1508,12 +1508,12 @@ switch handles.param.filter
     case 'median'
         handles.images.filtered = fnc_nD_median(handles.images.initial,xyk,zk,tk,ss,handles);
 end
-if handles.param.filter_tophat_use
-    for iC = 1:2
-        r = round(handles.expt.(['FWHM_max' num2str(iC)])/2);
-        handles.images.filtered(:,:,iC,:,:) = imtophat(handles.images.filtered(:,:,iC,:,:),strel('disk',r));
-    end
-end
+% if handles.param.filter_tophat_use
+%     for iC = 1:2
+%         r = round(handles.expt.(['FWHM_max' num2str(iC)])/2);
+%         handles.images.filtered(:,:,iC,:,:) = imtophat(handles.images.filtered(:,:,iC,:,:),strel('disk',r));
+%     end
+% end
 % set up the initial totals output array
 handles.totals = repmat(single(0),[handles.newnT handles.minnC handles.newnZ 7 1]);
 tempinitial = mean(mean(handles.images.initial(:,:,:,1:handles.zinc:handles.nZ,1:handles.tinc:handles.nT), 1),2);
@@ -1557,7 +1557,7 @@ if zksz == 1 && tksz == 1 % only 2D median required, so can use medfilt2 with on
     tkoff = tksz;
 else
     % kernel sizes are now used as minus to plus offsets around
-    % the chosen pixel. i.e. a kernel size of 3 become ±1.
+    % the chosen pixel. i.e. a kernel size of 3 become Â±1.
     xykoff = round((xyksz-1)./2);
     zkoff = round((zksz-1)./2);
     tkoff = round((tksz-1)./2);
@@ -1831,8 +1831,8 @@ options = get(handles.pop_back_method, 'String');
 pop_index = get(handles.pop_back_method, 'Value');
 handles.back_method = options{pop_index};
 iZ = get(handles.sld_Z, 'value');
-options = get(handles.pop_auto_corr_channel, 'String');
-pop_index = get(handles.pop_auto_corr_channel, 'Value');
+options = get(handles.pop_auto_corr_target, 'String');
+pop_index = get(handles.pop_auto_corr_target, 'Value');
 handles.auto_ch = str2double(options{pop_index});
 handles.frame_back = [];
 % calculate the background subtracted images
@@ -2629,6 +2629,7 @@ fnc_tip_plot_profile(handles.ax_image,handles);
 
 function handles = fnc_tip_profile_analyse(handles)
 peak_reset = contains(handles.tip_table.Properties.VariableNames,'peak');
+assignin('base','tip_table',handles.tip_table)
 handles.tip_table(:,peak_reset) = [];
 [handles.tip_table.peak_height, ...
     handles.tip_table.peak_displacement, ...
@@ -3438,7 +3439,7 @@ if get(handles.chk_tip_plot_profile_graph, 'Value') == 1
         nXT = round(-mX:(2*mX)/(nX-1):mX);
         sXT = num2str((nXT.*handles.param.pixel_size(1))', 2);
         set(gca,'XTick',nXT,'XTickLabel',sXT,'FontUnits','pixels','FontSize',11);
-        xlabel('profile position (µm)', 'FontSize',8);
+        xlabel('profile position (Âµm)', 'FontSize',8);
         % fix the y limits and ticks
         set(gca, 'ylim',[0 1], 'yTick', [0:0.1:1]);
         ylabel('intensity', 'FontSize',8);
@@ -3527,7 +3528,7 @@ mX = size(im_profile_interp,2);
 nXT = 1:(mX-1)/(nX-1):mX;
 sXT = num2str(((-(n/2):n/(nX-1):n/2).*(size(PT_mean,2)./301).*handles.expt.micron_per_pixel(1))', '%2.0f');
 set(gca,'XTick',nXT,'XTickLabel',sXT,'FontUnits','pixels','FontSize',11);
-xlabel('profile position (µm)', 'FontSize',8)
+xlabel('profile position (Âµm)', 'FontSize',8)
 % set up the y-axes tick marks and labels
 %nY = handles.nT;
 mY = size(im_profile_interp,1);
@@ -3573,7 +3574,7 @@ mX = size(im_profile_interp,2);
 nXT = 1:(mX-1)/(nX-1):mX;
 sXT = num2str(((-(n/2):n/(nX-1):n/2).*(size(PT_mean,2)./301).*handles.expt.micron_per_pixel(1))', '%2.0f');
 set(gca,'XTick',nXT,'XTickLabel',sXT,'FontUnits','pixels','FontSize',11);
-xlabel('profile position (µm)', 'FontSize',8)
+xlabel('profile position (Âµm)', 'FontSize',8)
 % set up the y-axes tick marks and labels
 %nY = handles.nT;
 mY = size(im_profile_interp,1);
@@ -3635,7 +3636,7 @@ plot([(mX+1)/2 (mX+1)/2],ylim,'k-')
 %     nXT = 1:(mX-1)/(nX-1):mX;
 %     sXT = num2str(((-(n/2):n/(nX-1):n/2).*handles.param.pixel_size(1))', 2);
 %     set(gca,'XTick',nXT,'XTickLabel',sXT,'FontUnits','pixels','FontSize',11);
-%     xlabel('profile position (µm)', 'FontSize',8)
+%     xlabel('profile position (Âµm)', 'FontSize',8)
 %     % set up the y-axes tick marks and labels
 %     %nY = handles.nT;
 %     mY = size(im_profile_interp,1);
@@ -4351,8 +4352,8 @@ options = get(handles.pop_display_merge, 'String');
 option_index = get(handles.pop_display_merge, 'Value');
 merge = options{option_index};
 % get the channel merge
-options = get(handles.pop_ch_colour_merge, 'String');
-option_index = get(handles.pop_ch_colour_merge, 'Value');
+options = get(handles.pop_display_merge_channel, 'String');
+option_index = get(handles.pop_display_merge_channel, 'Value');
 ch_merge = options{option_index};
 if get(handles.chk_display_merge, 'value') == 0
     % the merge flag overrides the merge selection
@@ -4420,6 +4421,7 @@ switch target
             im_out = zeros(sz(1),sz(2),1,'like',handles.images.(target));
             im_out(:,:,1) = squeeze(handles.images.(target)(:,:,iC,iZ,iT).*rgb_channels(iC));
         end
+        if ~ismatrix(im_out)
         switch ch_merge
             % now swap the channel order to match the channel colour selection
             case 'green-magenta'
@@ -4438,6 +4440,7 @@ switch target
                 % do nothing
             case 'GRB'
                 im_out = im_out(:,:,[2 1 3],:,:);
+        end
         end
     case 'selected'
         mx = max(handles.images.(target)(:));
@@ -4619,7 +4622,7 @@ end
 %                 cmap(1,:) = 1;
 %                 Cmin = log10(min([handles.polygon_stats{iC,iZ,iT}.Area]*((handles.expt.micron_per_pixel*handles.param.resample)^2),[],'omitnan'));
 %                 Cmax = log10(max([handles.polygon_stats{iC,iZ,iT}.Area]*((handles.expt.micron_per_pixel*handles.param.resample)^2),[],'omitnan'));
-%                 str = 'log10  area (µm^2)';
+%                 str = 'log10  area (Âµm^2)';
 %         end
 %         if ~isgraphics(handles.h_colorbar)
 %             % recreate the colorbar
@@ -5630,5 +5633,3 @@ function txt_plot_intercept_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
 function pop_plot_colormap_CreateFcn(hObject, eventdata, handles)
 fnc_textbox_background(hObject);
-
-
